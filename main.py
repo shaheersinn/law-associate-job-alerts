@@ -201,8 +201,7 @@ def _scrape_career_pages(page_urls: List[str], source_label: str) -> pd.DataFram
             lower_title = title.lower()
             if "associate" not in lower_title:
                 continue
-            if not any(k in lower_title for k in ("law", "legal", "lawyer")):
-                continue
+            
 
             job_url = urljoin(url, link["href"])
             try:
@@ -341,6 +340,17 @@ def filter_jobs(df: pd.DataFrame) -> pd.DataFrame:
 
     return candidates
 
+if os.environ.get("DEBUG") == "1":
+    print("DEBUG counts:",
+          "total=", len(df),
+          "legal=", int(matches_legal.sum()),
+          "negative=", int(matches_negative.sum()))
+    # show a few titles that were legal but failed positive
+    if "OPENAI_API_KEY" not in os.environ:
+        matches_positive = df["TEXT"].str.contains(POSITIVE_REGEX, na=False)
+        failed = df[matches_legal & ~matches_negative & ~matches_positive]
+        print("DEBUG: legal-but-not-positive examples:")
+        print(failed[["TITLE","COMPANY","JOB_URL"]].head(10).to_string(index=False))
 
 
 def llm_filter(jobs: pd.DataFrame) -> pd.DataFrame:
