@@ -280,7 +280,7 @@ def scrape_law_firm_sites() -> pd.DataFrame:
         "https://www.litigate.com/careers",
         "https://www.goodmans.ca/careers/current-opportunities",
         "https://www.blg.com/en/careers/legal-professionals/current-opportunities",
-        "https://www.nortonrosefulbright.com/en-ca/careers",
+        "https://nrfcanada.wd10.myworkdayjobs.com/en-CA/NRFC",
         "https://www.dentons.com/en/careers",
         "https://www.millerthomson.com/en/careers",
         "https://cassels.com/join-us/career-opportunities-lawyers/",
