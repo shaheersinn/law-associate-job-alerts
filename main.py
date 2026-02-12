@@ -109,8 +109,9 @@ def scrape_law_firm_sites() -> pd.DataFrame:
     # automated access; in that case the request will be skipped.
     firm_career_pages = [
         "https://www.osler.com/en/careers/",  # Osler
+               "https://www.osler.com/en/careers/",  # Osler, Hoskin & Harcourt LLP
         "https://www.blakes.com/careers/",  # Blake, Cassels & Graydon LLP
-        "https://www.bennettjones.com/Careers",  # Bennett Jones LLP【759468253450880†L56-L74】
+        "https://www.bennettjones.com/Careers",  # Bennett Jones LLP
         "https://www.fasken.com/en/careers",  # Fasken Martineau DuMoulin LLP
         "https://gowlingwlg.com/en/careers/",  # Gowling WLG
         "https://www.stikeman.com/en/careers",  # Stikeman Elliott LLP
@@ -118,21 +119,33 @@ def scrape_law_firm_sites() -> pd.DataFrame:
         "https://www.mccarthy.ca/en/careers",  # McCarthy Tétrault LLP
         "https://www.torys.com/en/careers",  # Torys LLP
         "https://www.litigate.com/careers",  # Lenczner Slaght (litigate.com)
+        # Additional firms requested by the user
+        "https://www.goodmans.ca/careers/current-opportunities",  # Goodmans LLP
+        "https        "https://www.osler.com/en/careers/",  # Osler, Hoskin & Harcourt LLP
+        "https://www.blakes.com/careers/",  # Blake, Cassels & Graydon LLP
+        "https://www.bennettjones.com/Careers",  # Bennett Jones LLP
+        "https://www.fasken.com/en/careers",  # Fasken Martineau DuMoulin LLP
+        "https://gowlingwlg.com/en/careers/",  # Gowling WLG
+        "https://www.stikeman.com/en/careers",  # Stikeman Elliott LLP
+        "https://www.dwpv.com/en/Careers",  # Davies Ward Phillips & Vineberg LLP
+        "https://www.mccarthy.ca/en/careers",  # McCarthy Tétrault LLP
+        "https://www.torys.com/en/careers",  # Torys LLP
+        "https://www.litigate.com/careers",  # Lenczner Slaght (litigate.com)
+        # Additional firms requested by the user
+        "https://www.goodmans.ca/careers/current-opportunities",  # Goodmans LLP
+        "https://www.blg.com/en/careers/legal-professionals/current-opportunities",  # Borden Ladner Gervais LLP (BLG)
+        "https://www.nortonrosefulbright.com/en-ca/careers",  # Norton Rose Fulbright Canada LLP
+        "https://www.dentons.com/en/careers",  # Dentons Canada LLP
+        "https://www.millerthomson.com/en/careers",  # Miller Thomson LLP
+        "https://cassels.com/join-us/career-opportunities-lawyers/",  # Cassels Brock & Blackwell LLP
     ]
-
-    jobs: list[dict] = []
-    # Experience patterns reused from filter_jobs; compiled once here
-    experience_patterns = [
-        r"0\s*-?\s*2\s*years",
-        r"1\s*-?\s*2\s*years",
-        r"\bfirst\s*year\b",
-        r"\bsecond\s*year\b",
-        r"\bentry[-\s]*level\b",
-        r"\bjunior\b",
     ]
     exp_regex = re.compile("|".join(experience_patterns), re.IGNORECASE)
 
-    # Use a standard desktop user‑agent to reduce the chance of blocking
+   
+        # Deduplicate firm URLs to avoid duplicates
+    firm_career_pages = list(dict.fromkeys(firm_career_pages))
+# Use a standard desktop user‑agent to reduce the chance of blocking
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
