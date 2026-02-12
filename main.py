@@ -577,7 +577,7 @@ def main() -> None:
     )
     print(f"\n  Total combined before filtering: {len(combined)}")
 
-    filtered = filter_jobs(combined)
+    
     filtered = remove_old_jobs(filtered, max_age_days=40)
     print(f"  Total after filtering:           {len(filtered)}")
 
