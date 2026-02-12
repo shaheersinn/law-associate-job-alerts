@@ -10,7 +10,8 @@ To run locally, set the following environment variables or define them in your
 shell:
 
     EMAIL_USER:    Sender Gmail account (e.g. example@gmail.com)
-    EMAIL_PASS:    App password for the Gmail account
+    EMAIL_PASS:    Gmail App Password (NOT your regular Gmail password)
+                   Generate one at: myaccount.google.com/apppasswords
     EMAIL_TO:      Comma-separated list of recipient addresses
     RESULTS_WANTED (optional): Number of results to request per board
 
@@ -64,12 +65,10 @@ def perform_scrape(search_term: str, location: str, results_wanted: int = 100) -
         f"{search_term} jobs first year second year 0-2 years experience in {location}"
     )
 
-    # Request jobs from multiple boards. JobSpy supports LinkedIn, Indeed, Google and
-    # ZipRecruiter among others. We pass a list of board names and request a modest
-    # number of results to avoid excessive scraping. Setting hours_old=168 restricts
-    # results to the past week.
+    # NOTE: ZipRecruiter is excluded — it returns 403 Forbidden (Cloudflare WAF block)
+    # when run from GitHub Actions IPs and cannot be used reliably.
     jobs = scrape_jobs(
-        site_name=["linkedin", "indeed", "google", "zip_recruiter"],
+        site_name=["linkedin", "indeed", "google"],
         search_term=search_term,
         google_search_term=google_search_term,
         location=location,
@@ -104,29 +103,26 @@ def scrape_law_firm_sites() -> pd.DataFrame:
         A DataFrame with columns similar to the JobSpy output: SITE, TITLE,
         COMPANY, CITY, STATE, DATE, JOB_URL and DESCRIPTION.
     """
-    # List of law firm career pages to query. These URLs point directly to the
-    # careers or opportunities sections of each firm. Some sites may block
-    # automated access; in that case the request will be skipped.
     firm_career_pages = [
-        "https://www.osler.com/en/careers/",           # Osler, Hoskin & Harcourt LLP
-        "https://www.blakes.com/careers/",             # Blake, Cassels & Graydon LLP
-        "https://www.bennettjones.com/Careers",        # Bennett Jones LLP
-        "https://www.fasken.com/en/careers",           # Fasken Martineau DuMoulin LLP
-        "https://gowlingwlg.com/en/careers/",          # Gowling WLG
-        "https://www.stikeman.com/en/careers",         # Stikeman Elliott LLP
-        "https://www.dwpv.com/en/Careers",             # Davies Ward Phillips & Vineberg LLP
-        "https://www.mccarthy.ca/en/careers",          # McCarthy Tétrault LLP
-        "https://www.torys.com/en/careers",            # Torys LLP
-        "https://www.litigate.com/careers",            # Lenczner Slaght (litigate.com)
-        "https://www.goodmans.ca/careers/current-opportunities",                        # Goodmans LLP
-        "https://www.blg.com/en/careers/legal-professionals/current-opportunities",    # Borden Ladner Gervais LLP
-        "https://www.nortonrosefulbright.com/en-ca/careers",                           # Norton Rose Fulbright Canada LLP
-        "https://www.dentons.com/en/careers",          # Dentons Canada LLP
-        "https://www.millerthomson.com/en/careers",    # Miller Thomson LLP
-        "https://cassels.com/join-us/career-opportunities-lawyers/",                   # Cassels Brock & Blackwell LLP
+        "https://www.osler.com/en/careers/",
+        "https://www.blakes.com/careers/",
+        "https://www.bennettjones.com/Careers",
+        "https://www.fasken.com/en/careers",
+        "https://gowlingwlg.com/en/careers/",
+        "https://www.stikeman.com/en/careers",
+        "https://www.dwpv.com/en/Careers",
+        "https://www.mccarthy.ca/en/careers",
+        "https://www.torys.com/en/careers",
+        "https://www.litigate.com/careers",
+        "https://www.goodmans.ca/careers/current-opportunities",
+        "https://www.blg.com/en/careers/legal-professionals/current-opportunities",
+        "https://www.nortonrosefulbright.com/en-ca/careers",
+        "https://www.dentons.com/en/careers",
+        "https://www.millerthomson.com/en/careers",
+        "https://cassels.com/join-us/career-opportunities-lawyers/",
     ]
 
-    # Deduplicate firm URLs to avoid duplicates
+    # Deduplicate firm URLs
     firm_career_pages = list(dict.fromkeys(firm_career_pages))
 
     # Patterns indicating 0-2 years experience or entry-level roles
@@ -137,6 +133,8 @@ def scrape_law_firm_sites() -> pd.DataFrame:
         r"\bsecond\s*year\b",
         r"\bentry[-\s]*level\b",
         r"\bjunior\b",
+        r"\bnewly\s*called\b",
+        r"\bnew\s*call\b",
     ]
     exp_regex = re.compile("|".join(experience_patterns), re.IGNORECASE)
 
@@ -145,28 +143,26 @@ def scrape_law_firm_sites() -> pd.DataFrame:
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
             " AppleWebKit/537.36 (KHTML, like Gecko)"
-            " Chrome/109 Safari/537.36"
+            " Chrome/120.0.0.0 Safari/537.36"
         )
     }
 
     jobs = []
 
     for url in firm_career_pages:
+        print(f"  Scraping: {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=20)
-        except Exception:
-            # Skip sites that cannot be reached
+        except Exception as exc:
+            print(f"    SKIP — could not reach site: {exc}")
             continue
         if resp.status_code != 200:
-            # Many sites protect against bots; ignore non-200 responses
+            print(f"    SKIP — status {resp.status_code}")
             continue
+
         soup = BeautifulSoup(resp.text, "html.parser")
         base_domain = urlparse(url).netloc
 
-        # Collect job links on the careers page. We look for anchors containing
-        # the word "associate" and at least one legal keyword; this reduces
-        # noise from support roles (e.g., IT positions). Titles are kept to
-        # improve readability later.
         for link in soup.find_all("a", href=True):
             title = link.get_text(strip=True)
             if not title:
@@ -177,7 +173,6 @@ def scrape_law_firm_sites() -> pd.DataFrame:
             if not any(k in lower_title for k in ("law", "legal", "lawyer")):
                 continue
             job_url = urljoin(url, link["href"])
-            # Follow the job posting link to extract the description
             try:
                 j_resp = requests.get(job_url, headers=headers, timeout=20)
             except Exception:
@@ -188,7 +183,6 @@ def scrape_law_firm_sites() -> pd.DataFrame:
             text = job_soup.get_text(separator="\n").strip()
             if not text:
                 continue
-            # Only record the job if the description mentions early-career patterns
             if not exp_regex.search(text):
                 continue
             jobs.append(
@@ -214,16 +208,15 @@ def filter_jobs(df: pd.DataFrame) -> pd.DataFrame:
     Filter the scraped jobs to include only first-/second-year law associate roles.
 
     The function checks the title and description for legal keywords and
-    experience-level patterns.
+    experience-level patterns, and explicitly excludes senior-level roles.
     """
     if df.empty:
         return df
 
-    # Combine title and description for easier searching
     df = df.copy()
-    df["TEXT"] = (df["TITLE"].fillna("") + "\n" + df["DESCRIPTION"].fillna(" ")).str.lower()
+    df["TEXT"] = (df["TITLE"].fillna("") + "\n" + df["DESCRIPTION"].fillna("")).str.lower()
 
-    # Keywords that must be present to imply the job is for a law associate
+    # Must contain a legal keyword
     legal_keywords = [
         r"\bassociate\b",
         r"\blaw\b",
@@ -231,29 +224,43 @@ def filter_jobs(df: pd.DataFrame) -> pd.DataFrame:
         r"\blawyer\b",
     ]
 
-    # Patterns indicating 0-2 years experience or entry-level roles
+    # Must match an early-career experience pattern
     experience_patterns = [
         r"0\s*-?\s*2\s*years",
         r"1\s*-?\s*2\s*years",
-        r"\bfirst\s*year\b",
-        r"\bsecond\s*year\b",
+        r"\bfirst[\s\-]*year\b",
+        r"\bsecond[\s\-]*year\b",
         r"\bentry[-\s]*level\b",
         r"\bjunior\b",
+        r"\bnewly\s*called\b",
+        r"\bnew\s*call\b",
+        r"\bcalled to the bar within\b",
     ]
 
-    # Compile regex patterns for efficiency
+    # Must NOT contain senior-level indicators
+    exclusion_patterns = [
+        r"\bsenior\s*associate\b",
+        r"\bpartner\b",
+        r"\b[3-9]\+?\s*years\b",
+        r"\b[1-9][0-9]+\s*years\b",
+        r"\blead\s*counsel\b",
+        r"\bmanaging\s*associate\b",
+    ]
+
     legal_regex = re.compile("|".join(legal_keywords), re.IGNORECASE)
     exp_regex = re.compile("|".join(experience_patterns), re.IGNORECASE)
+    excl_regex = re.compile("|".join(exclusion_patterns), re.IGNORECASE)
 
-    # Apply filters
     matches_legal = df["TEXT"].str.contains(legal_regex)
     matches_exp = df["TEXT"].str.contains(exp_regex)
+    is_excluded = df["TEXT"].str.contains(excl_regex)
 
-    filtered = df[matches_legal & matches_exp].copy()
+    filtered = df[matches_legal & matches_exp & ~is_excluded].copy()
 
-    # Drop duplicates by job URL if present
+    # Drop duplicates by job URL
     if "JOB_URL" in filtered.columns:
         filtered = filtered.drop_duplicates(subset=["JOB_URL"])
+
     return filtered
 
 
@@ -264,44 +271,55 @@ def format_email_content(jobs: pd.DataFrame) -> str:
     if jobs.empty:
         return (
             "No matching law associate jobs were found this week.\n\n"
-            "Your alert agent searched LinkedIn, Indeed, Google Jobs and ZipRecruiter,"
-            " but none of the recent postings met the 0-2 years experience criteria."
+            "Your alert agent searched LinkedIn, Indeed, Google Jobs, and Canadian law"
+            " firm career pages, but none of the recent postings met the"
+            " 0-2 years experience criteria for Canada."
         )
 
     lines: List[str] = []
     for _, row in jobs.iterrows():
-        site = row.get("SITE", "Unknown site").title()
-        title = row.get("TITLE", "Unknown title")
-        company = row.get("COMPANY", "Unknown company")
-        city = row.get("CITY", "")
-        state = row.get("STATE", "")
+        site = str(row.get("SITE", "Unknown site")).title()
+        title = str(row.get("TITLE", "Unknown title"))
+        company = str(row.get("COMPANY", "Unknown company"))
+        city = str(row.get("CITY", "") or "")
+        state = str(row.get("STATE", "") or "")
         location = ", ".join(filter(None, [city, state]))
-        date_posted = row.get("DATE", row.get("DATE_POSTED", ""))
-        link = row.get("JOB_URL", row.get("URL", ""))
-        description = row.get("DESCRIPTION", "").strip().replace("\n", " ")
-        snippet = description[:200] + ("..." if len(description) > 200 else "")
+        date_posted = str(row.get("DATE", row.get("DATE_POSTED", "")) or "")
+        link = str(row.get("JOB_URL", row.get("URL", "")) or "")
+        description = str(row.get("DESCRIPTION", "") or "").strip().replace("\n", " ")
+        snippet = description[:300] + ("..." if len(description) > 300 else "")
 
         lines.append(
-            f"Site: {site}\n"
-            f"Title: {title}\n"
-            f"Company: {company}\n"
-            f"Location: {location}\n"
-            f"Date posted: {date_posted}\n"
-            f"Link: {link}\n"
-            f"Summary: {snippet}\n"
-            f"---\n"
+            f"Site:        {site}\n"
+            f"Title:       {title}\n"
+            f"Company:     {company}\n"
+            f"Location:    {location or 'Canada'}\n"
+            f"Date posted: {date_posted or 'N/A'}\n"
+            f"Link:        {link}\n"
+            f"Summary:     {snippet}\n"
+            f"{'-' * 60}\n"
         )
-    body = (
-        f"Here are the latest first- and second-year law associate job postings as of "
-        f"{datetime.utcnow():%Y-%m-%d} (UTC):\n\n"
+
+    header = (
+        f"Weekly Law Associate Job Digest — {datetime.utcnow():%B %d, %Y} (UTC)\n"
+        f"{'=' * 60}\n"
+        f"Found {len(jobs)} matching role(s) for first/second-year law associates in Canada.\n\n"
     )
-    body += "\n".join(lines)
-    return body
+    return header + "\n".join(lines)
 
 
 def send_email(subject: str, body: str, sender: str, password: str, recipients: List[str]) -> None:
     """
-    Send an email using Gmail's SMTP server.
+    Send an email using Gmail's SMTP server with an App Password.
+
+    NOTE: You must use a Gmail App Password, NOT your regular Gmail password.
+    Regular passwords will always fail with SMTPAuthenticationError (535 5.7.8).
+
+    Steps to generate an App Password:
+      1. Enable 2-Step Verification at myaccount.google.com/security
+      2. Go to myaccount.google.com/apppasswords
+      3. Select 'Mail' as the app and click Generate
+      4. Copy the 16-character password (no spaces) into your EMAIL_PASS GitHub secret
     """
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -309,47 +327,75 @@ def send_email(subject: str, body: str, sender: str, password: str, recipients: 
     msg["To"] = ", ".join(recipients)
     msg.set_content(body)
 
-    # Use SSL connection for Gmail; port 465 is the default
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(sender, password)
-        smtp.send_message(msg)
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(sender, password)
+            smtp.send_message(msg)
+        print(f"✓ Email sent successfully to: {', '.join(recipients)}")
+    except smtplib.SMTPAuthenticationError:
+        raise RuntimeError(
+            "\n\nGmail authentication failed (535 5.7.8).\n"
+            "You must use a Gmail App Password, not your regular password.\n"
+            "Steps:\n"
+            "  1. Go to myaccount.google.com/apppasswords\n"
+            "  2. Generate a password for 'Mail'\n"
+            "  3. Update your EMAIL_PASS GitHub secret with the 16-character password (no spaces)\n"
+        )
+    except smtplib.SMTPException as exc:
+        raise RuntimeError(f"Failed to send email: {exc}") from exc
 
 
 def main() -> None:
-    # Load configuration
+    # Load configuration from environment variables / GitHub Secrets
     sender = get_env_variable("EMAIL_USER")
     password = get_env_variable("EMAIL_PASS")
     recipients_raw = get_env_variable("EMAIL_TO")
     recipients = [addr.strip() for addr in recipients_raw.split(",") if addr.strip()]
 
-    # Parameter for number of results; default to 100 if not provided
     try:
         results_wanted = int(os.environ.get("RESULTS_WANTED", "100"))
     except ValueError:
         results_wanted = 100
 
-    # Define the search term and location
     search_term = "law associate"
     location = "Canada"
 
-    # Scrape public job boards via JobSpy
-    all_jobs = perform_scrape(search_term, location, results_wanted)
+    print("=" * 60)
+    print("Weekly Law Associate Job Scraper starting...")
+    print(f"Run time: {datetime.utcnow():%Y-%m-%d %H:%M:%S} UTC")
+    print("=" * 60)
 
-    # Scrape Canadian law firm career pages
-    firm_jobs = scrape_law_firm_sites()
+    # Step 1 — Scrape public job boards
+    print("\n[1/3] Scraping public job boards (LinkedIn, Indeed, Google)...")
+    try:
+        all_jobs = perform_scrape(search_term, location, results_wanted)
+        print(f"  → Found {len(all_jobs)} raw postings from job boards.")
+    except Exception as exc:
+        print(f"  WARNING: Job board scrape failed: {exc}")
+        all_jobs = pd.DataFrame()
 
-    # Combine job board results and law firm postings
+    # Step 2 — Scrape Canadian law firm career pages
+    print("\n[2/3] Scraping Canadian law firm career pages...")
+    try:
+        firm_jobs = scrape_law_firm_sites()
+        print(f"  → Found {len(firm_jobs)} raw postings from law firm sites.")
+    except Exception as exc:
+        print(f"  WARNING: Law firm site scrape failed: {exc}")
+        firm_jobs = pd.DataFrame()
+
+    # Step 3 — Combine, filter, and send
+    print("\n[3/3] Filtering and sending email...")
     combined_jobs = pd.concat([all_jobs, firm_jobs], ignore_index=True, sort=False)
+    print(f"  → Total combined before filtering: {len(combined_jobs)}")
 
-    # Filter jobs for first-/second-year roles
     filtered_jobs = filter_jobs(combined_jobs)
+    print(f"  → Total after filtering: {len(filtered_jobs)}")
 
-    # Build email content
     body = format_email_content(filtered_jobs)
-    subject = "Weekly Law Associate Job Alerts (0-2 years experience)"
+    subject = f"Weekly Law Associate Job Alerts — {datetime.utcnow():%B %d, %Y}"
 
-    # Send the email
     send_email(subject, body, sender, password, recipients)
+    print("\nDone.")
 
 
 if __name__ == "__main__":
