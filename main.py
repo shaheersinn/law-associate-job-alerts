@@ -2,19 +2,26 @@
 """
 Weekly Law Associate Job Scraper
 
-Scrapes job boards via python-jobspy + best-effort scraping of firm/recruiter sites,
-filters for first-/second-year associate roles (0–2 years) in Canada, deduplicates,
-and emails a weekly digest.
+Scrapes job postings from:
+- job boards via python-jobspy
+- best-effort scraping of firm/recruiter career pages
+
+Filters for:
+- LAW ASSOCIATE roles in Canada
+- first/second year OR 0–2 years (or equivalent "newly called" wording)
+- excludes seniors (3+ years, senior associate, partner, etc.)
+
+Emails weekly digest.
 
 ENV VARS (GitHub Secrets):
-  EMAIL_USER        Sender Gmail address (use an App Password)
-  EMAIL_PASS        Gmail App Password (NOT your normal password)
-  EMAIL_TO          Comma-separated recipients
-  RESULTS_WANTED    Optional, default 100
-  DRY_RUN           Optional "1" to print email instead of sending
-  OPENAI_API_KEY    Optional: enables LLM verification (recommended)
-  OPENAI_MODEL      Optional: default "gpt-4o-mini"
-  DEBUG             Optional "1" to print filter diagnostics
+  EMAIL_USER
+  EMAIL_PASS
+  EMAIL_TO
+  RESULTS_WANTED (optional, default 100)
+  DRY_RUN (optional "1")
+  OPENAI_API_KEY (optional: enables LLM verification)
+  OPENAI_MODEL (optional, default "gpt-4o-mini")
+  DEBUG (optional "1")
 """
 
 from __future__ import annotations
@@ -48,19 +55,45 @@ except ImportError:
 # Regex patterns
 # ─────────────────────────────────────────────────────────────────────────────
 
+# “Associate” must exist, AND legal context must exist (law/legal/lawyer/etc.)
+ASSOCIATE_REGEX = re.compile(r"\bassociate\b", re.IGNORECASE)
+
+LEGAL_CONTEXT_REGEX = re.compile(
+    r"|".join([
+        r"\blaw\b",
+        r"\blegal\b",
+        r"\blawyer\b",
+        r"\bsolicitor\b",
+        r"\bbarrister\b",
+        r"\bcalled\s+to\s+the\s+bar\b",
+        r"\bbar\s+admission\b",
+        r"\bjuris\s+doctor\b",
+        r"\bj\.?d\.?\b",
+        r"\bllb\b",
+        r"\bll\.?b\.?\b",
+        r"\bllm\b",
+        r"\bin[-\s]*house\s+counsel\b",
+        r"\bcounsel\b",
+        r"\blitigation\b",
+        r"\bcorporate\b",
+        r"\bsecurities\b",
+        r"\bm&a\b",
+        r"\bmergers?\b",
+        r"\bacquisitions?\b",
+    ]),
+    re.IGNORECASE
+)
+
 _POSITIVE_PATTERNS = [
     # explicit 0–2 phrasing
     r"\b0\s*[-–to]+\s*2\s*years\b",
     r"\b0\s*to\s*2\s*years\b",
     r"\bup\s*to\s*2\s*years\b",
-    r"\b0\s*[-–]\s*2\s*yrs\b",
-    r"\b0\s*[-–]\s*2\s*year\b",
     r"\b1\s*[-–]\s*2\s*years\b",
-    r"\b0\s*[-–]\s*1\s*years\b",
-    r"\b0\s*[-–]\s*1\s*year\b",
-    r"\b1\s*[-–]\s*2\s*yrs\b",
     r"\b0\s*[-–]\s*2\s*pqe\b",
     r"\b1\s*[-–]\s*2\s*pqe\b",
+    r"\b0\s*[-–]\s*2\s*yrs\b",
+    r"\b1\s*[-–]\s*2\s*yrs\b",
 
     # year level language
     r"\bfirst[\s\-]*year\b",
@@ -70,12 +103,10 @@ _POSITIVE_PATTERNS = [
     r"\bnewly\s+called\b",
     r"\brecent\s+call\b",
     r"\bcalled\s+to\s+the\s+bar\s+within\s*2\s*years\b",
-
-    # variants you asked to capture
     r"\barticling\s+associate\b",
-    r"\b(?:new|recent)\s+(?:call|called)\b",
 ]
 
+# Make groups non-capturing to avoid pandas warning about match groups
 _NEGATIVE_PATTERNS = [
     r"\bsenior\b",
     r"\bpartner\b",
@@ -87,25 +118,44 @@ _NEGATIVE_PATTERNS = [
     r"\bdirector\b",
     r"\bexecutive\b",
     r"\b(?:3|4|5|6|7|8|9|10)\+?\s*years\b",
-    r"\b3\+\s*yrs\b",
-    r"\b5\+\s*yrs\b",
     r"\bminimum\s+of\s+(?:3|4|5)\s+years\b",
-    r"\b(?:3|4|5)\s*\+\s*years\b",
 ]
 
-_LEGAL_KEYWORDS = [
-    r"\bassociate\b",
-    r"\blaw\b",
-    r"\blegal\b",
-    r"\blawyer\b",
-    r"\bbar\b",
-    r"\bsolicitor\b",
-    r"\bbarrister\b",
-]
+# Strong non-legal negatives to prevent Warehouse Associate etc.
+NON_LEGAL_NEGATIVE_REGEX = re.compile(
+    r"|".join([
+        r"\bwarehouse\b",
+        r"\bdistribution\b",
+        r"\bretail\b",
+        r"\bcashier\b",
+        r"\bstore\b",
+        r"\bstock\b",
+        r"\bmerchandis",
+        r"\bcustomer\s+service\b",
+        r"\bsales\b",
+        r"\bshipping\b",
+        r"\breceiving\b",
+        r"\bforklift\b",
+    ]),
+    re.IGNORECASE
+)
+
+# Student/career info pages that are NOT associate lawyer jobs
+CAREER_INFO_NEGATIVE_REGEX = re.compile(
+    r"|".join([
+        r"\bstudents?\b",
+        r"\bsummer\s+student\b",
+        r"\barticling\s+student\b",
+        r"\bstudent\s+program\b",
+        r"\bhow\s+to\s+apply\b",
+        r"\bapplication\s+process\b",
+        r"\brecruitment\s+process\b",
+    ]),
+    re.IGNORECASE
+)
 
 POSITIVE_REGEX = re.compile("|".join(_POSITIVE_PATTERNS), re.IGNORECASE)
 NEGATIVE_REGEX = re.compile("|".join(_NEGATIVE_PATTERNS), re.IGNORECASE)
-LEGAL_REGEX    = re.compile("|".join(_LEGAL_KEYWORDS),    re.IGNORECASE)
 
 _SCRAPER_HEADERS = {
     "User-Agent": (
@@ -161,48 +211,79 @@ def save_history(history_path: str, job_ids: set) -> None:
 
 
 def remove_old_jobs(df: pd.DataFrame, max_age_days: int = 40) -> pd.DataFrame:
-    """Keep jobs with unknown date, or posted within max_age_days."""
     if df.empty:
         return df
 
     cutoff = pd.Timestamp.utcnow() - pd.Timedelta(days=max_age_days)
 
-    primary  = df["DATE"] if "DATE" in df.columns else pd.Series([None] * len(df), index=df.index)
+    primary = df["DATE"] if "DATE" in df.columns else pd.Series([None] * len(df), index=df.index)
     fallback = df["DATE_POSTED"] if "DATE_POSTED" in df.columns else pd.Series([None] * len(df), index=df.index)
     combined = primary.where(primary.notna(), fallback)
 
     dt = pd.to_datetime(combined, errors="coerce", utc=True)
     keep = dt.isna() | (dt >= cutoff)
-
     return df.loc[keep].copy()
 
 
 def _http_get(url: str, timeout: int = 20) -> Optional[requests.Response]:
-    """GET with minimal retry/backoff for 429 and transient errors."""
     try:
         resp = requests.get(url, headers=_SCRAPER_HEADERS, timeout=timeout)
     except Exception:
         return None
 
+    # simple retry on rate limiting
     if resp.status_code == 429:
         time.sleep(3)
         try:
             resp = requests.get(url, headers=_SCRAPER_HEADERS, timeout=timeout)
         except Exception:
             return None
-
     return resp
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Career/recruiter scraping (best-effort)
+# Scrapers
 # ─────────────────────────────────────────────────────────────────────────────
 
+def perform_scrape(search_term: str, location: str, results_wanted: int = 100) -> pd.DataFrame:
+    if scrape_jobs is None:
+        print("  WARNING: python-jobspy not installed. Skipping job board scrape.")
+        return pd.DataFrame()
+
+    google_search_term = (
+        f"{search_term} first year second year 0-2 years PQE lawyer associate {location}"
+    )
+
+    jobs = scrape_jobs(
+        site_name=["linkedin", "indeed", "google"],
+        search_term=search_term,
+        google_search_term=google_search_term,
+        location=location,
+        results_wanted=results_wanted,
+        hours_old=168,
+        country_indeed="Canada",
+        linkedin_fetch_description=True,
+        verbose=0,
+    )
+
+    if jobs is None or jobs.empty:
+        return pd.DataFrame()
+
+    jobs.columns = [col.upper() for col in jobs.columns]
+    return jobs
+
+
+def _looks_like_job_posting(url: str) -> bool:
+    u = url.lower()
+    # keep real job URLs; drop generic search pages / career info pages
+    bad = ["jobsearch", "searchstring=", "locationstring=", "/students", "how-to-apply", "application-process"]
+    if any(b in u for b in bad):
+        return False
+    good = ["job", "jobs", "opening", "opportunit", "position", "posting", "viewjob", "careers"]
+    return any(g in u for g in good)
+
+
 def _scrape_career_pages(page_urls: List[str], source_label: str) -> pd.DataFrame:
-    """
-    Best-effort HTML scraping for job links on career pages.
-    NOTE: Many large firms use JS-rendered ATS pages; those may still return 0.
-    """
     jobs: List[dict] = []
 
     for url in page_urls:
@@ -218,88 +299,57 @@ def _scrape_career_pages(page_urls: List[str], source_label: str) -> pd.DataFram
         soup = BeautifulSoup(resp.text, "html.parser")
         base_domain = urlparse(url).netloc
 
-        # Heuristic: only follow “job-like” links to avoid crawling the whole site
         candidate_links = []
         for a in soup.find_all("a", href=True):
-            text = a.get_text(strip=True)
+            text = a.get_text(strip=True) or ""
             href = a["href"].strip()
             if not href:
                 continue
 
-            combined = (text + " " + href).lower()
-
-            # Must be “associate” somewhere in link text or URL, OR job-ish URL
-            is_associateish = "associate" in combined
-            is_jobish = any(k in combined for k in ("career", "careers", "job", "jobs", "opening", "opportunit", "position"))
-
-            if is_associateish or is_jobish:
-                candidate_links.append((text, href))
-
-        # Limit to keep Actions runs sane
-        candidate_links = candidate_links[:40]
-
-        for title, href in candidate_links:
             job_url = urljoin(url, href)
-
-            # same-domain only (avoid random external links)
             if urlparse(job_url).netloc and urlparse(job_url).netloc != base_domain:
                 continue
 
+            if not _looks_like_job_posting(job_url):
+                continue
+
+            combined = (text + " " + job_url).lower()
+
+            # Only follow links that look like actual roles
+            # (associate/lawyer/legal/counsel/junior)
+            if not any(k in combined for k in ["associate", "lawyer", "legal", "counsel", "junior", "pqe", "call"]):
+                continue
+
+            candidate_links.append((text, job_url))
+
+        candidate_links = candidate_links[:40]
+
+        for title, job_url in candidate_links:
             j_resp = _http_get(job_url)
             time.sleep(0.4)
             if j_resp is None or j_resp.status_code != 200:
                 continue
 
-            page_text = BeautifulSoup(j_resp.text, "html.parser").get_text(separator="\n").strip()
-            if not page_text:
+            text = BeautifulSoup(j_resp.text, "html.parser").get_text(separator="\n").strip()
+            if not text:
                 continue
 
-            # Do NOT enforce POSITIVE here (it causes 0). We only exclude obvious seniors.
-            if NEGATIVE_REGEX.search(page_text):
+            # Skip obvious non-role pages (students/how-to-apply etc.)
+            if CAREER_INFO_NEGATIVE_REGEX.search(text) and not ASSOCIATE_REGEX.search(text):
                 continue
 
             jobs.append({
                 "SITE": base_domain,
-                "TITLE": title or "Associate (link)",
+                "TITLE": title or "Posting",
                 "COMPANY": base_domain,
                 "CITY": "",
                 "STATE": "",
                 "DATE": "",
                 "JOB_URL": job_url,
-                "DESCRIPTION": page_text,
+                "DESCRIPTION": text,
             })
 
     return pd.DataFrame(jobs) if jobs else pd.DataFrame()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Job board scraping via jobspy
-# ─────────────────────────────────────────────────────────────────────────────
-
-def perform_scrape(search_term: str, location: str, results_wanted: int = 100) -> pd.DataFrame:
-    if scrape_jobs is None:
-        print("  WARNING: python-jobspy not installed. Skipping job board scrape.")
-        return pd.DataFrame()
-
-    google_search_term = f"{search_term} first year second year 0-2 years PQE Canada"
-
-    jobs = scrape_jobs(
-        site_name=["linkedin", "indeed", "google"],
-        search_term=search_term,
-        google_search_term=google_search_term,
-        location=location,
-        results_wanted=results_wanted,
-        hours_old=168,  # last 7 days
-        country_indeed="Canada",
-        linkedin_fetch_description=True,
-        verbose=0,
-    )
-
-    if jobs is None or jobs.empty:
-        return pd.DataFrame()
-
-    jobs.columns = [col.upper() for col in jobs.columns]
-    return jobs
 
 
 def scrape_law_firm_sites() -> pd.DataFrame:
@@ -341,50 +391,59 @@ def scrape_recruiter_sites() -> pd.DataFrame:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Filtering (fixed to avoid filtering everything to 0)
+# Filtering
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _llm_is_enabled() -> bool:
+    """Only treat LLM as enabled if the library is installed and a key is present."""
+    return (openai is not None) and bool(os.environ.get("OPENAI_API_KEY"))
+
 
 def filter_jobs(df: pd.DataFrame) -> pd.DataFrame:
     """
     Candidate filter:
-      - keep legal-ish roles
-      - exclude clear seniors
-      - if no OPENAI_API_KEY, require POSITIVE match (strict mode)
-      - if OPENAI_API_KEY is set, let the LLM do the 0–2 verification later
+      - must have "associate"
+      - must have legal context ("law"/"legal"/"lawyer"/etc.)
+      - exclude seniors + obvious non-legal associate roles
+      - if LLM disabled, require POSITIVE regex too
     """
     if df.empty:
         return df
 
     df = df.copy()
-
     if "TITLE" not in df.columns:
         df["TITLE"] = ""
     if "DESCRIPTION" not in df.columns:
         df["DESCRIPTION"] = ""
 
-    df["TEXT"] = (df["TITLE"].fillna("") + "\n" + df["DESCRIPTION"].fillna("")).astype(str).str.lower()
+    df["TEXT"] = (df["TITLE"].fillna("") + "\n" + df["DESCRIPTION"].fillna("")).astype(str)
 
-    matches_legal = df["TEXT"].str.contains(LEGAL_REGEX, na=False)
-    matches_negative = df["TEXT"].str.contains(NEGATIVE_REGEX, na=False)
+    # Core: associate + legal context
+    has_associate = df["TEXT"].str.contains(ASSOCIATE_REGEX, na=False)
+    has_legal_ctx = df["TEXT"].str.contains(LEGAL_CONTEXT_REGEX, na=False)
 
-    candidates = df[matches_legal & ~matches_negative].copy()
+    # Exclusions
+    is_senior = df["TEXT"].str.contains(NEGATIVE_REGEX, na=False)
+    is_nonlegal_assoc = df["TEXT"].str.contains(NON_LEGAL_NEGATIVE_REGEX, na=False)
 
-    # If we DON'T have an OpenAI key, we must rely on regex positives
-    if not os.environ.get("OPENAI_API_KEY"):
-        matches_positive = candidates["TEXT"].str.contains(POSITIVE_REGEX, na=False)
-        candidates = candidates[matches_positive].copy()
+    candidates = df[has_associate & has_legal_ctx & ~is_senior & ~is_nonlegal_assoc].copy()
+
+    # If LLM is NOT enabled, enforce strict junior signals
+    if not _llm_is_enabled():
+        has_positive = candidates["TEXT"].str.contains(POSITIVE_REGEX, na=False)
+        candidates = candidates[has_positive].copy()
 
     if os.environ.get("DEBUG") == "1":
-        total = len(df)
-        print(f"DEBUG filter: total={total} legal={int(matches_legal.sum())} negative={int(matches_negative.sum())} candidates={len(candidates)}")
-        if not os.environ.get("OPENAI_API_KEY"):
-            # show examples that were legal & not negative but failed positive
-            failed = df[matches_legal & ~matches_negative].copy()
-            failed = failed[~failed["TEXT"].str.contains(POSITIVE_REGEX, na=False)]
-            cols = [c for c in ["TITLE", "COMPANY", "JOB_URL"] if c in failed.columns]
-            if not failed.empty and cols:
-                print("DEBUG examples (legal but no explicit 0–2 wording):")
-                print(failed[cols].head(10).to_string(index=False))
+        print(
+            "DEBUG filter counts:",
+            f"total={len(df)}",
+            f"assoc={int(has_associate.sum())}",
+            f"legalctx={int(has_legal_ctx.sum())}",
+            f"senior={int(is_senior.sum())}",
+            f"nonlegal_assoc={int(is_nonlegal_assoc.sum())}",
+            f"candidates={len(candidates)}",
+            f"llm_enabled={_llm_is_enabled()}",
+        )
 
     if "JOB_URL" in candidates.columns:
         candidates = candidates.drop_duplicates(subset=["JOB_URL"])
@@ -395,34 +454,26 @@ def filter_jobs(df: pd.DataFrame) -> pd.DataFrame:
 def llm_filter(jobs: pd.DataFrame) -> pd.DataFrame:
     """
     LLM verification:
-      “Does this job require 0–2 years AND is it a law associate role in Canada?”
-    Runs only if OPENAI_API_KEY is set.
+    - Only runs if openai library + OPENAI_API_KEY exist.
+    - IMPORTANT FIX: on exception -> reject (do NOT keep junk).
     """
-    if openai is None:
+    if not _llm_is_enabled():
         return jobs
 
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return jobs
-
+    client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])  # type: ignore
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
-    client = openai.OpenAI(api_key=api_key)
     kept_rows = []
-
     for _, row in jobs.iterrows():
-        description = _safe_str(row.get("DESCRIPTION"))[:5000]
         title = _safe_str(row.get("TITLE"))[:200]
-        company = _safe_str(row.get("COMPANY"))[:200]
+        desc = _safe_str(row.get("DESCRIPTION"))[:5000]
 
         prompt = (
-            "You are filtering Canadian legal job postings.\n"
-            "Return ONLY one word: YES or NO.\n\n"
-            "Question: Is this posting for a LAW ASSOCIATE role in CANADA that requires 0–2 years of experience (or equivalent junior/newly-called wording)?\n"
-            "Reject senior roles (3+ years, senior associate, partner, lead counsel).\n\n"
+            "Answer ONLY: YES or NO.\n\n"
+            "Is this a Canadian LAW ASSOCIATE job requiring 0–2 years (or first/second year, "
+            "newly called/recent call) and NOT a senior role?\n\n"
             f"TITLE: {title}\n"
-            f"COMPANY: {company}\n"
-            f"DESCRIPTION:\n{description}\n"
+            f"DESCRIPTION:\n{desc}\n"
         )
 
         try:
@@ -432,54 +483,42 @@ def llm_filter(jobs: pd.DataFrame) -> pd.DataFrame:
                 max_tokens=3,
                 temperature=0.0,
             )
-            answer = (resp.choices[0].message.content or "").strip().upper()
-            if answer.startswith("YES"):
+            ans = (resp.choices[0].message.content or "").strip().upper()
+            if ans.startswith("YES"):
                 kept_rows.append(row)
         except Exception:
-            # Keep on error to avoid “false zero”
-            kept_rows.append(row)
+            # FIX: reject on error instead of keeping garbage
+            continue
 
     return pd.DataFrame(kept_rows, columns=jobs.columns) if kept_rows else pd.DataFrame(columns=jobs.columns)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Email formatting/sending
+# Email
 # ─────────────────────────────────────────────────────────────────────────────
-
-def generate_summary_stats(current_jobs: pd.DataFrame, previous_ids: set) -> str:
-    lines: List[str] = [
-        f"New jobs this run:      {len(current_jobs)}",
-        f"Previously sent jobs:   {len(previous_ids)}",
-    ]
-    return "\n".join(lines)
-
 
 def format_email_content(jobs: pd.DataFrame) -> str:
     if jobs.empty:
         return (
-            "No matching law associate jobs were found this week.\n\n"
-            "Tip: If you set OPENAI_API_KEY, the agent can identify 0–2 year roles "
-            "even when the posting doesn't literally say “0–2 years”."
+            "No matching first-/second-year LAW ASSOCIATE jobs were found this week.\n\n"
+            "If you're seeing too few results, add OPENAI_API_KEY so the LLM can "
+            "detect junior roles even when postings don’t explicitly say “0–2 years”."
         )
 
-    lines: List[str] = []
+    lines = []
     for _, row in jobs.iterrows():
-        site = _safe_str(row.get("SITE")) or "Unknown site"
+        site = _safe_str(row.get("SITE")) or "Unknown"
         title = _safe_str(row.get("TITLE")) or "Unknown title"
         company = _safe_str(row.get("COMPANY")) or "Unknown company"
-        city = _safe_str(row.get("CITY"))
-        state = _safe_str(row.get("STATE"))
-        location = ", ".join([x for x in [city, state] if x]) or "Canada"
-        date_posted = _safe_str(row.get("DATE") or row.get("DATE_POSTED")) or "N/A"
         link = _safe_str(row.get("JOB_URL") or row.get("URL"))
-        description = _safe_str(row.get("DESCRIPTION")).replace("\n", " ")
-        snippet = description[:320] + ("..." if len(description) > 320 else "")
+        date_posted = _safe_str(row.get("DATE") or row.get("DATE_POSTED")) or "N/A"
+        desc = _safe_str(row.get("DESCRIPTION")).replace("\n", " ")
+        snippet = desc[:320] + ("..." if len(desc) > 320 else "")
 
         lines.append(
             f"Site:        {site}\n"
             f"Title:       {title}\n"
             f"Company:     {company}\n"
-            f"Location:    {location}\n"
             f"Date posted: {date_posted}\n"
             f"Link:        {link}\n"
             f"Summary:     {snippet}\n"
@@ -494,29 +533,16 @@ def format_email_content(jobs: pd.DataFrame) -> str:
     return header + "\n".join(lines)
 
 
-def send_email(
-    subject: str,
-    body: str,
-    sender: str,
-    password: str,
-    recipients: List[str],
-) -> None:
+def send_email(subject: str, body: str, sender: str, password: str, recipients: List[str]) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
     msg.set_content(body)
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(sender, password)
-            smtp.send_message(msg)
-        print(f"✓ Email sent to: {', '.join(recipients)}")
-    except smtplib.SMTPAuthenticationError:
-        raise RuntimeError(
-            "Gmail authentication failed.\n"
-            "Use a Gmail App Password (not your normal password) for EMAIL_PASS."
-        )
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(sender, password)
+        smtp.send_message(msg)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -555,7 +581,7 @@ def main() -> None:
         print(f"  WARNING: Law firm scrape failed: {exc}")
         firm_jobs = pd.DataFrame()
 
-    print("\n[3/4] Scraping legal recruiter and job board sites...")
+    print("\n[3/4] Scraping recruiter / legal job board sites...")
     try:
         recruiter_jobs = scrape_recruiter_sites()
         print(f"  → {len(recruiter_jobs)} raw postings from recruiter sites.")
@@ -566,42 +592,37 @@ def main() -> None:
     combined = pd.concat([all_jobs, firm_jobs, recruiter_jobs], ignore_index=True, sort=False)
     print(f"\n  Total combined before filtering: {len(combined)}")
 
-    # ✅ FIX: actually define filtered before using it
     filtered = filter_jobs(combined)
     filtered = remove_old_jobs(filtered, max_age_days=40)
+
     print(f"  Total after filtering:           {len(filtered)}")
 
     history_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "job_history.json")
     history_ids = load_history(history_file)
-    prev_ids = history_ids.copy()
 
     if "JOB_URL" in filtered.columns and not filtered.empty:
         new_jobs = filtered[~filtered["JOB_URL"].isin(history_ids)].copy()
     else:
         new_jobs = filtered.copy()
 
-    # ✅ If OpenAI key exists, this is where “0–2 years” precision happens
+    # LLM verification (only if enabled)
     new_jobs = llm_filter(new_jobs)
 
+    # Update history
     if "JOB_URL" in new_jobs.columns:
         history_ids.update(new_jobs["JOB_URL"].dropna().tolist())
     save_history(history_file, history_ids)
 
-    print(f"  New jobs (not seen before):      {len(new_jobs)}")
-
-    print("\n[4/4] Building and sending email...")
-    summary_text = generate_summary_stats(new_jobs, prev_ids)
-    plain_body = summary_text + "\n\n" + format_email_content(new_jobs)
     subject = f"Weekly Law Associate Job Alerts — {datetime.utcnow():%B %d, %Y}"
+    body = format_email_content(new_jobs)
 
     if dry_run:
         print("\n--- DRY RUN: email not sent ---")
-        print(f"Subject: {subject}\n")
-        print(plain_body)
+        print(body)
         return
 
-    send_email(subject, plain_body, sender, password, recipients)
-    print("\nDone ✓")
+    send_email(subject, body, sender, password, recipients)
+    print(f"✓ Email sent to: {', '.join(recipients)}")
 
 
 if __name__ == "__main__":
