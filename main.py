@@ -72,7 +72,7 @@ _POSITIVE_PATTERNS = [
 _NEGATIVE_PATTERNS = [
     r"\bsenior\b",
     r"\bpartner\b",
-    r"\b(3|4|5|6|7|8|9|10)\+?\s*years\b",
+    r"\b(?:3|4|5|6|7|8|9|10)\+?\s*years\b",
     r"\blead\s+counsel\b",
     r"\bmanager\b",
     r"\bexecutive\b",
@@ -143,30 +143,34 @@ def save_history(history_path: str, job_ids: set) -> None:
 def remove_old_jobs(df: pd.DataFrame, max_age_days: int = 40) -> pd.DataFrame:
     """
     Remove jobs older than max_age_days. Jobs with no parseable date are kept.
-
-    FIX: Original used df.get("DATE") which is a dict method, not a DataFrame
-    method, and would silently return None instead of the column. Replaced
-    with proper column access guarded by an 'in df.columns' check.
+    Handles strings, datetime/date objects, and pandas Timestamps safely.
     """
     if df.empty:
         return df
 
-    cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+    cutoff = pd.Timestamp.utcnow() - pd.Timedelta(days=max_age_days)
 
-    def is_recent(date_str: str) -> bool:
-        if not date_str:
-            return True
-        for fmt in ("%Y-%m-%d", "%d %b %Y", "%b %d, %Y", "%d %B %Y"):
-            try:
-                return datetime.strptime(date_str.strip(), fmt) >= cutoff
-            except ValueError:
-                continue
-        return True
+    # Prefer DATE, fall back to DATE_POSTED, otherwise empty
+    if "DATE" in df.columns:
+        primary = df["DATE"]
+    else:
+        primary = pd.Series([None] * len(df), index=df.index)
 
-    dates       = df["DATE"].fillna("")        if "DATE"        in df.columns else pd.Series("", index=df.index)
-    date_posted = df["DATE_POSTED"].fillna("") if "DATE_POSTED" in df.columns else pd.Series("", index=df.index)
-    combined    = dates.where(dates != "", date_posted)
-    return df[combined.apply(is_recent)].copy()
+    if "DATE_POSTED" in df.columns:
+        fallback = df["DATE_POSTED"]
+    else:
+        fallback = pd.Series([None] * len(df), index=df.index)
+
+    combined = primary.where(primary.notna(), fallback)
+
+    # Convert whatever we have (date/datetime/strings) into timestamps
+    dt = pd.to_datetime(combined, errors="coerce", utc=True)
+
+    # Keep rows with unknown date (NaT) OR fresh enough
+    keep = dt.isna() | (dt >= cutoff)
+
+    return df.loc[keep].copy()
+
 
 
 def _scrape_career_pages(page_urls: List[str], source_label: str) -> pd.DataFrame:
