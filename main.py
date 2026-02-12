@@ -268,8 +268,8 @@ def perform_scrape(search_term: str, location: str, results_wanted: int = 100) -
 def scrape_law_firm_sites() -> pd.DataFrame:
     """Scrape predefined Canadian law firm career pages for associate roles."""
     pages = list(dict.fromkeys([
-        "https://www.osler.com/en/careers/",
-        "https://www.blakes.com/careers/",
+        "https://recruiting.ultipro.ca/CAR5001CARS/JobBoard/65254eda-a168-4846-86ed-442ed6042262/?q=&o=postedDateDesc",
+        "https://www.joinblakes.com/jobs/?orderby=date&order=desc",
         "https://www.bennettjones.com/Careers",
         "https://www.fasken.com/en/careers",
         "https://gowlingwlg.com/en/careers/",
@@ -294,7 +294,7 @@ def scrape_law_firm_sites() -> pd.DataFrame:
 def scrape_recruiter_sites() -> pd.DataFrame:
     """Scrape Canadian legal recruiter and job board sites."""
     pages = list(dict.fromkeys([
-        "https://www.zsa.ca/",
+        "https://www.zsa.ca/current-opportunities/?search_keywords=&search_location=",
         "https://www.thecounselnetwork.com/",
         "https://www.lifeafterlaw.com/",
         "https://www.thehellergroup.ca/",
