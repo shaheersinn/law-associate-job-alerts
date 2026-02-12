@@ -319,25 +319,28 @@ def scrape_recruiter_sites() -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def filter_jobs(df: pd.DataFrame) -> pd.DataFrame:
-    """Filter scraped jobs to first-/second-year law associate roles only."""
     if df.empty:
         return df
 
     df = df.copy()
-    df["TEXT"] = (
-        df["TITLE"].fillna("") + "\n" + df["DESCRIPTION"].fillna("")
-    ).str.lower()
+    df["TEXT"] = (df["TITLE"].fillna("") + "\n" + df["DESCRIPTION"].fillna("")).str.lower()
 
     matches_legal    = df["TEXT"].str.contains(LEGAL_REGEX)
-    matches_positive = df["TEXT"].str.contains(POSITIVE_REGEX)
     matches_negative = df["TEXT"].str.contains(NEGATIVE_REGEX)
 
-    filtered = df[matches_legal & matches_positive & ~matches_negative].copy()
+    # Broad candidate set:
+    candidates = df[matches_legal & ~matches_negative].copy()
 
-    if "JOB_URL" in filtered.columns:
-        filtered = filtered.drop_duplicates(subset=["JOB_URL"])
+    # If no LLM key, fall back to strict positive matching
+    if not os.environ.get("OPENAI_API_KEY"):
+        matches_positive = candidates["TEXT"].str.contains(POSITIVE_REGEX)
+        candidates = candidates[matches_positive].copy()
 
-    return filtered
+    if "JOB_URL" in candidates.columns:
+        candidates = candidates.drop_duplicates(subset=["JOB_URL"])
+
+    return candidates
+
 
 
 def llm_filter(jobs: pd.DataFrame) -> pd.DataFrame:
