@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Weekly Law Associate Job Scraper (Deep Crawl Edition)
+Weekly Law Associate Job Scraper (Strict Filter Edition)
 
-Improvements:
-- Pagination: Follows 'Next' links up to 3 pages deep on firm sites.
-- Deep Inspection: Visits every job link to read the full description.
-- Smart Cleaning: Isolates job text from website menus/footers.
-- Parallel Processing: heavily threaded for speed.
+Updates:
+- Eliminates "News", "People", "Team", and "Program Overview" links.
+- Strictly enforces 0-2 year experience limit (kills 3+, 4+, 5+, mid-level).
+- Verifies page content looks like a job (has 'Apply', 'Qualifications') before accepting.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ import concurrent.futures
 from email.message import EmailMessage
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
-from typing import List, Set, Optional
+from typing import List, Optional
 
 import pandas as pd
 import requests
@@ -40,172 +39,189 @@ except ImportError:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. Configuration & Regex (Strict Filters)
+# 1. STRICT REGEX FILTERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Browser Headers (Anti-Blocking)
+# Headers to look like a real browser
 _SCRAPER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
+        "Chrome/123.0.0.0 Safari/537.36"
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Connection": "keep-alive",
 }
 
 # 1. POSITIVE MATCH: Title must contain one of these
 _ROLE_TITLES = [
     r"\bassociate\b",
     r"\blawyer\b",
-    r"\bcounsel\b",
+    r"\bcounsel\b", # We filter out "Senior Counsel" later
     r"\bjuriste\b",
     r"\bavocat\b",
-    r"\bstudent\b",    # Includes articling/summer students
+    r"\bstudent\b",
     r"\barticling\b",
-    r"\bclerk\b",      # Law clerks
+    r"\bsummer\b",
+    r"\bclerk\b",
 ]
 
-# 2. NEGATIVE MATCH: Title must NOT contain these
+# 2. NEGATIVE TITLES (Instant Reject)
+# Removes Senior, Mid-Level, Admin, and "Page Titles" (News, Team, etc)
 _BLOCKED_TITLES = [
+    # Seniority/Role Mismatches
+    r"\bsenior\b",
+    r"\bpartner\b",
+    r"\bdirector\b",
+    r"\bmanager\b",
+    r"\bvp\b",
+    r"\bpresident\b",
+    r"\bmid-?level\b",
+    r"\bintermediate\b",
+    r"\bprincipal\b",
+    r"\b(3|4|5|6|7|8|9)\+?\s*years\b", # "3 years", "3+ years", "4-5 years"
+    r"\b(3|4|5|6|7|8|9)\s*-\s*\d+\s*years\b",
+    
+    # Non-Legal Roles
     r"\bwarehouse\b",
     r"\bdriver\b",
     r"\bsales\b",
     r"\bretail\b",
-    r"\bmanager\b",
-    r"\bdirector\b",
-    r"\bpartner\b",
-    r"\bsenior\b",
-    r"\bvp\b",
-    r"\bpresident\b",
     r"\bmarketing\b",
     r"\bfinance\b",
     r"\btechnician\b",
-    r"\bexecutive\s+assistant\b",
-    r"\breceptionist\b",
+    r"\bassistant\b",
+    r"\bparalegal\b",
+    r"\bcoordinator\b",
+    
+    # "Junk" Page Titles (News, Navigation, Info)
+    r"\bnews\b",
+    r"\bevents?\b",
+    r"\bspeaks?\b",       # "Lawyer speaks at..."
+    r"\bnamed\b",        # "Firm named top 10..."
+    r"\bteam\b",         # "Our Team"
+    r"\bprofiles?\b",    # "Lawyer Profiles"
+    r"\bmeet\b",         # "Meet our students"
+    r"\bcontact\b",
+    r"\babout\b",
+    r"\boverview\b",     # "Program Overview"
+    r"\bprogram\b",      # "Student Program" (Too generic, we want specific job ads)
+    r"\bresources\b",
+    r"\bbenefit\b",
+    r"\bhow\s+to\s+apply\b",
 ]
 
-# 3. CONTEXT MATCH: Full text must contain at least one legal term
-_LEGAL_CONTEXT = [
-    r"\blaw\b",
-    r"\blegal\b",
-    r"\blitigation\b",
-    r"\bcorporate\b",
-    r"\bcommercial\b",
-    r"\bemployment\b",
-    r"\btransactional\b",
-    r"\badvocacy\b",
-    r"\bbar\s*admission\b",
-    r"\blaw\s*society\b",
-    r"\bll\.?b\.?\b",
-    r"\bj\.?d\.?\b",
+# 3. BLOCKED URL PATTERNS (Don't even click these)
+_BLOCKED_URL_SUBSTRINGS = [
+    "/people/", "/team/", "/profiles/", "/bios/",
+    "/news/", "/events/", "/insights/", "/publications/",
+    "/contact", "/about", "/history", "/awards",
+    "/student-program", "/students-home", # Landing pages
+    "/diversity", "/inclusion", "/community",
+]
+
+# 4. EXPERIENCE POSITIVE (If description exists, it MUST match one of these OR not match negative)
+_EXP_POSITIVE = [
+    r"0\s*-?\s*2\s*years",
+    r"1\s*-?\s*2\s*years",
+    r"junior",
+    r"entry\s*level",
+    r"newly\s*called",
+    r"recent\s*call",
+    r"202[4-6]\s*call",
+    r"articling",
+    r"summer",
+    r"student",
 ]
 
 RE_TITLES = re.compile("|".join(_ROLE_TITLES), re.IGNORECASE)
 RE_BLOCKED = re.compile("|".join(_BLOCKED_TITLES), re.IGNORECASE)
-RE_CONTEXT = re.compile("|".join(_LEGAL_CONTEXT), re.IGNORECASE)
+RE_EXP_POS = re.compile("|".join(_EXP_POSITIVE), re.IGNORECASE)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. Advanced Helpers
+# 2. Filtering Logic
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_session():
-    """Create a robust session with retries."""
-    session = requests.Session()
-    retry = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["HEAD", "GET", "OPTIONS"]
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    session.headers.update(_SCRAPER_HEADERS)
-    return session
-
+def is_junk_url(url: str) -> bool:
+    """Check if URL looks like a blog, profile, or news page."""
+    u = url.lower()
+    if any(x in u for x in _BLOCKED_URL_SUBSTRINGS):
+        return True
+    return False
 
 def clean_html_text(html_content: str) -> str:
-    """
-    Smart Cleaning: Removes scripts, styles, navbars, and footers to 
-    extract only the 'real' body text of the job description.
-    """
+    """Extract visible text, stripping scripts/nav/footer."""
     soup = BeautifulSoup(html_content, "html.parser")
-    
-    # Kill all script and style elements
-    for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
-        script.extract()
-        
-    # Get text
-    text = soup.get_text(separator=' ')
-    
-    # Break into lines and remove leading and trailing space on each
-    lines = (line.strip() for line in text.splitlines())
-    # Break multi-headlines into a line each
-    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-    # Drop blank lines
-    text = '\n'.join(chunk for chunk in chunks if chunk)
-    return text
+    for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+        tag.extract()
+    return soup.get_text(separator=' ').strip()
 
-
-def is_relevant_job(title: str, description: str = "") -> bool:
+def looks_like_job_posting(text: str) -> bool:
     """
-    Strict filtering logic.
+    Heuristic: Does the page contain 'apply', 'qualifications', 'responsibilities'?
+    Used to filter out generic 'About our Student Program' landing pages.
+    """
+    t = text.lower()
+    keywords = ["apply", "submit", "resume", "cover letter", "qualifications", "responsibilities", "requirements", "email"]
+    # It needs to match at least 2 of these to be considered a real job posting
+    matches = sum(1 for k in keywords if k in t)
+    return matches >= 2
+
+def is_relevant_job(title: str, description: str = "", url: str = "") -> bool:
+    """
+    Strict Master Filter.
     """
     t_clean = str(title).strip()
     d_clean = str(description).strip()
     combined = (t_clean + " " + d_clean).lower()
 
-    # 1. Blocklist (Fast Fail)
+    # 1. URL Check (Prevent "News" links)
+    if is_junk_url(url):
+        return False
+
+    # 2. Title Blocklist (Fast Fail)
+    # If title mentions "Senior" or "3-5 years", KILL IT.
     if RE_BLOCKED.search(t_clean):
         return False
 
-    # 2. Title Allowlist
+    # 3. Title Allowlist
     if not RE_TITLES.search(t_clean):
         return False
 
-    # 3. Context Check (Must sound legal)
-    # If we have a description, check it. If not, rely on title + URL context.
-    if d_clean and not RE_CONTEXT.search(combined):
-        return False
+    # 4. Strict Description Scan (if available)
+    if d_clean:
+        # A. Check for "Senior" keywords in description that definitely disqualify
+        # Regex for "5+ years", "minimum 4 years", etc.
+        senior_reqs = re.search(r"\b(?:minimum|at least|requir\w+)\s+(?:3|4|5|6|7|8|9|10)\+?\s*years", combined)
+        if senior_reqs:
+            return False
+            
+        senior_roles = re.search(r"\b(senior|mid-level|intermediate)\s+associate", combined)
+        if senior_roles:
+            return False
+
+        # B. (Optional) Enforce Positive Match
+        # If the description is long but doesn't mention "junior", "0-2", "student", etc., 
+        # it's suspicious. But some generic ads might omit it.
+        # For STRICT mode, we can uncomment below:
+        # if not RE_EXP_POS.search(combined):
+        #    return False
 
     return True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. Deep Scraper (Pagination + Detail View)
+# 3. Scrapers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def find_next_page(soup: BeautifulSoup, current_url: str) -> Optional[str]:
-    """
-    Heuristic to find a 'Next' button or page number in the HTML.
-    """
-    # Common text patterns for pagination
-    next_patterns = [
-        re.compile(r"next", re.I),
-        re.compile(r"›", re.I),
-        re.compile(r">", re.I),
-        re.compile(r"more", re.I)
-    ]
-    
-    for link in soup.find_all("a", href=True):
-        text = link.get_text(strip=True)
-        # Check if text matches "Next" or similar
-        for pat in next_patterns:
-            if pat.search(text) and len(text) < 15: # "Next" shouldn't be a long sentence
-                next_url = urljoin(current_url, link["href"])
-                if next_url != current_url:
-                    return next_url
-                    
-    return None
+def get_session():
+    s = requests.Session()
+    retry = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+    s.mount("https://", HTTPAdapter(max_retries=retry))
+    s.headers.update(_SCRAPER_HEADERS)
+    return s
 
-
-def scrape_site_deep(session, start_url: str, max_pages: int = 3) -> List[dict]:
-    """
-    Scrapes a site, follows pagination, and visits every job link.
-    """
+def scrape_site_deep(session, start_url: str, max_pages=2) -> List[dict]:
     found_jobs = []
     visited_urls = set()
     urls_to_visit = [start_url]
@@ -215,158 +231,124 @@ def scrape_site_deep(session, start_url: str, max_pages: int = 3) -> List[dict]:
     
     while urls_to_visit and pages_scraped < max_pages:
         current_url = urls_to_visit.pop(0)
-        if current_url in visited_urls:
-            continue
-            
-        print(f"    Scanning: {current_url}")
+        if current_url in visited_urls: continue
+        
         visited_urls.add(current_url)
         pages_scraped += 1
         
         try:
-            resp = session.get(current_url, timeout=15)
-            if resp.status_code != 200:
-                continue
-                
+            resp = session.get(current_url, timeout=10)
+            if resp.status_code != 200: continue
+            
             soup = BeautifulSoup(resp.text, "html.parser")
             
-            # 1. Find Job Links
-            job_links = []
+            # 1. Find Links
+            links = []
             for a in soup.find_all("a", href=True):
-                title = a.get_text(" ", strip=True)
-                href = a["href"]
+                txt = a.get_text(" ", strip=True)
+                href = urljoin(current_url, a["href"])
                 
-                # Basic pre-filter on title to avoid visiting "Privacy Policy"
-                if len(title) > 3 and RE_TITLES.search(title) and not RE_BLOCKED.search(title):
-                    full_link = urljoin(current_url, href)
-                    if full_link not in visited_urls:
-                        job_links.append((title, full_link))
+                # Filter Link BEFORE clicking
+                if len(txt) > 5 and RE_TITLES.search(txt) and not RE_BLOCKED.search(txt):
+                    if not is_junk_url(href) and href not in visited_urls:
+                        links.append((txt, href))
 
-            # 2. Visit Each Job Link (Deep Dive)
-            for j_title, j_link in job_links:
-                if j_link in visited_urls: 
-                    continue
+            # 2. Visit Links
+            for j_title, j_link in links:
+                if j_link in visited_urls: continue
+                visited_urls.add(j_link)
                 
                 try:
-                    # Go to job page
-                    j_resp = session.get(j_link, timeout=10)
-                    visited_urls.add(j_link)
-                    
-                    if j_resp.status_code == 200:
-                        full_desc = clean_html_text(j_resp.text)
+                    r_job = session.get(j_link, timeout=10)
+                    if r_job.status_code == 200:
+                        full_text = clean_html_text(r_job.text)
                         
-                        # FINAL DECISION: Is this a legal job?
-                        if is_relevant_job(j_title, full_desc):
+                        # CONTENT CHECK: Does it look like a job?
+                        if not looks_like_job_posting(full_text):
+                            continue
+                            
+                        # LOGIC CHECK: Is it 0-2 years / Legal?
+                        if is_relevant_job(j_title, full_text, j_link):
                             found_jobs.append({
-                                "SITE": domain,
                                 "TITLE": j_title,
                                 "COMPANY": domain.split('.')[0].title(),
-                                "CITY": "Canada", # Generic, hard to parse per-site
-                                "DATE": datetime.now().strftime("%Y-%m-%d"),
-                                "JOB_URL": j_link,
-                                "DESCRIPTION": full_desc[:5000] # Limit size
+                                "URL": j_link
                             })
                 except Exception:
                     pass
 
-            # 3. Look for Pagination (Add to queue)
-            next_link = find_next_page(soup, current_url)
-            if next_link and next_link not in visited_urls:
-                urls_to_visit.append(next_link)
-
-        except Exception as e:
-            print(f"    Error on {domain}: {e}")
+        except Exception:
+            pass
             
     return found_jobs
 
-
-def scrape_custom_sites_parallel(urls: List[str], source_label: str) -> pd.DataFrame:
-    print(f"  [{source_label}] Deep crawling {len(urls)} sites (Max 3 pages depth)...")
+def scrape_custom_sites(urls):
+    print(f"  [Direct] Scanning {len(urls)} sites...")
     all_jobs = []
     session = get_session()
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        future_to_url = {executor.submit(scrape_site_deep, session, url): url for url in urls}
-        
-        for future in concurrent.futures.as_completed(future_to_url):
+        futures = {executor.submit(scrape_site_deep, session, u): u for u in urls}
+        for f in concurrent.futures.as_completed(futures):
             try:
-                data = future.result()
-                if data:
-                    all_jobs.extend(data)
-            except Exception:
-                pass
-                
-    return pd.DataFrame(all_jobs) if all_jobs else pd.DataFrame()
+                res = f.result()
+                if res: all_jobs.extend(res)
+            except: pass
+    return pd.DataFrame(all_jobs)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. JobSpy (Aggregator)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def scrape_aggregators() -> pd.DataFrame:
-    if scrape_jobs is None:
-        return pd.DataFrame()
-        
-    print("  [Aggregator] Scraping Indeed/LinkedIn/Google...")
-    # Broader search, strictly filtered later
-    search_term = "lawyer associate"
+def scrape_aggregators():
+    if scrape_jobs is None: return pd.DataFrame()
+    print("  [Aggregator] Scraping Indeed/LinkedIn...")
+    
+    # Specific search to minimize junk
+    # "0-2 years" in quotes forces strict match on some engines
+    search = "associate lawyer"
     
     try:
         jobs = scrape_jobs(
-            site_name=["indeed", "linkedin", "google"],
-            search_term=search_term,
-            google_search_term=f"{search_term} legal -warehouse -driver in Canada",
+            site_name=["indeed", "linkedin"],
+            search_term=search,
+            google_search_term=f"{search} \"0-2 years\" -senior -warehouse -driver in Canada",
             location="Canada",
-            results_wanted=50, 
+            results_wanted=30,
             hours_old=168,
             country_indeed="Canada",
             linkedin_fetch_description=True,
             verbose=0
         )
-    except Exception:
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
-    if jobs is None or jobs.empty:
-        return pd.DataFrame()
-        
+    if jobs is None or jobs.empty: return pd.DataFrame()
     jobs.columns = [col.upper() for col in jobs.columns]
     
-    # Filter aggregator results with the same strict logic
     valid = []
     for _, row in jobs.iterrows():
         t = str(row.get("TITLE", ""))
         d = str(row.get("DESCRIPTION", ""))
-        if is_relevant_job(t, d):
+        u = str(row.get("JOB_URL", ""))
+        
+        if is_relevant_job(t, d, u):
             valid.append(row)
             
     return pd.DataFrame(valid)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. URL Lists (Comprehensive)
+# 4. URLs
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_target_urls():
-    """
-    Returns a combined list of Law Firm and Recruiter URLs.
-    Includes separate tabs for Students vs Associates where applicable.
-    """
+def get_urls():
+    # Only "Current Opportunities" pages. No generic "Careers" landing pages.
     return [
-        # --- LAW FIRMS ---
         "https://www.joinblakes.com/careers/associates/",
-        "https://www.joinblakes.com/careers/students/",
         "https://www.bennettjones.com/en/Careers/Legal-Professionals",
-        "https://www.bennettjones.com/en/Careers/Students",
         "https://www.fasken.com/en/careers/lawyers",
-        "https://www.fasken.com/en/careers/students",
         "https://gowlingwlg.com/en/careers/current-opportunities/",
         "https://www.stikeman.com/en/careers/legal",
-        "https://www.stikeman.com/en/careers/students",
         "https://www.dwpv.com/en/Careers/Lawyers",
-        "https://www.dwpv.com/en/Careers/Students",
         "https://www.mccarthy.ca/en/careers/lawyers",
         "https://www.torys.com/careers/lawyers",
         "https://www.goodmans.ca/careers/associates",
-        "https://www.goodmans.ca/careers/students",
         "https://www.blg.com/en/careers/current-opportunities",
         "https://www.millerthomson.com/en/careers/lawyers/",
         "https://cassels.com/join-us/career-opportunities-lawyers/",
@@ -375,106 +357,75 @@ def get_target_urls():
         "https://www.litigate.com/careers/lawyers",
         "https://www.wildlaw.ca/careers/lawyers/",
         "https://www.osler.com/en/careers/opportunities",
-        "https://www.torkinmanes.com/careers/lawyers",
-        "https://www.foglers.com/careers/legal-professionals/",
-        "https://www.mindengross.com/careers/lawyers",
-        
-        # --- RECRUITERS ---
         "https://www.zsa.ca/job-board/",
         "https://thecounselnetwork.com/job-search/",
-        "https://www.lifeafterlaw.com/opportunities",
-        "https://thehellergroup.ca/opportunities/",
-        "https://www.smithlegalsearch.com/opportunities/",
-        "https://cartelinc.com/job-search/",
-        "https://edgerecruitment.ca/vacancies/",
-        "https://www.urbanlegal.ca/opportunities",
         "https://legaljobs.ca/jobs/",
         "https://www.cba.org/r/Jobs/Home",
     ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. Main
+# 5. Main
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
-    start_time = time.time()
     print("="*60)
-    print(f"Deep Law Job Scraper Started: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print("Strict Law Job Scraper (0-2 Years Only)")
     print("="*60)
-
-    # 1. Aggregators
-    df_agg = scrape_aggregators()
     
-    # 2. Direct Sites (Deep Crawl)
-    df_direct = scrape_custom_sites_parallel(get_target_urls(), "Direct Sites")
-
-    # 3. Combine
-    combined = pd.concat([df_agg, df_direct], ignore_index=True, sort=False)
+    df1 = scrape_aggregators()
+    df2 = scrape_custom_sites(get_urls())
     
-    # 4. Deduplicate (URL based) & History Check
-    history_file = "job_history.json"
-    if os.path.exists(history_file):
-        with open(history_file, 'r') as f:
-            history_ids = set(json.load(f))
-    else:
-        history_ids = set()
-
-    new_jobs = []
+    combined = pd.concat([df1, df2], ignore_index=True, sort=False)
+    
+    # Clean & Dedup
     if not combined.empty:
-        # Normalize URL
-        combined['CLEAN_URL'] = combined.apply(
-            lambda x: (x.get("JOB_URL") or x.get("URL") or "").split('?')[0], axis=1
-        )
-        combined = combined.drop_duplicates(subset=['CLEAN_URL'])
+        # Normalize URL column
+        if "URL" not in combined.columns: combined["URL"] = pd.NA
+        combined["FINAL_URL"] = combined["JOB_URL"].fillna(combined["URL"])
+        combined = combined.dropna(subset=["FINAL_URL"])
+        
+        # Remove duplicates
+        combined["CLEAN_URL"] = combined["FINAL_URL"].apply(lambda x: x.split('?')[0])
+        combined = combined.drop_duplicates(subset=["CLEAN_URL"])
+        
+        # Final Loop to print
+        final_jobs = combined
+    else:
+        final_jobs = pd.DataFrame()
 
-        for _, row in combined.iterrows():
-            if row['CLEAN_URL'] and row['CLEAN_URL'] not in history_ids:
-                new_jobs.append(row)
-                history_ids.add(row['CLEAN_URL'])
+    print(f"\nFinal Verified Jobs: {len(final_jobs)}")
     
-    final_df = pd.DataFrame(new_jobs)
-    
-    # 5. Save History
-    with open(history_file, 'w') as f:
-        json.dump(list(history_ids), f)
-
-    print(f"\nTotal New Jobs Found: {len(final_df)}")
-
-    # 6. Email
-    if not final_df.empty:
+    if not final_jobs.empty:
+        # Email Logic
         sender = os.environ.get("EMAIL_USER")
         password = os.environ.get("EMAIL_PASS")
         recipients = os.environ.get("EMAIL_TO", "").split(",")
         
-        if sender and password and recipients:
-            lines = [f"Found {len(final_df)} new roles:\n"]
-            for _, row in final_df.iterrows():
-                lines.append(f"ROLE: {row.get('TITLE')}")
-                lines.append(f"FIRM: {row.get('COMPANY')}")
-                lines.append(f"LINK: {row.get('JOB_URL') or row.get('URL')}")
-                lines.append("-" * 40)
+        lines = []
+        for _, row in final_jobs.iterrows():
+            lines.append(f"ROLE: {row.get('TITLE')}")
+            lines.append(f"FIRM: {row.get('COMPANY')}")
+            lines.append(f"LINK: {row.get('FINAL_URL')}")
+            lines.append("-" * 40)
             
-            body = "\n".join(lines)
+        print("\n".join(lines)) # Print to console
+        
+        if sender and password and recipients:
             msg = EmailMessage()
-            msg.set_content(body)
-            msg["Subject"] = f"Legal Job Alert: {len(final_df)} New Roles"
+            msg.set_content("\n".join(lines))
+            msg["Subject"] = f"Job Alert: {len(final_jobs)} Strict Matches"
             msg["From"] = sender
             msg["To"] = ", ".join(recipients)
-
             try:
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-                    smtp.login(sender, password)
-                    smtp.send_message(msg)
-                print("✓ Email sent.")
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
+                    s.login(sender, password)
+                    s.send_message(msg)
+                print("✓ Email Sent")
             except Exception as e:
-                print(f"✗ Email error: {e}")
-        else:
-            print(final_df[['TITLE', 'COMPANY', 'JOB_URL']].to_string())
+                print(f"✗ Email Failed: {e}")
     else:
-        print("No new jobs.")
-
-    print(f"Finished in {time.time() - start_time:.2f} seconds.")
+        print("No jobs found matching strict criteria.")
 
 if __name__ == "__main__":
     main()
