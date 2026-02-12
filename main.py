@@ -318,43 +318,110 @@ def perform_scrape(search_term: str, location: str, results_wanted: int = 100) -
 
 
 def scrape_law_firm_sites() -> pd.DataFrame:
+    """
+    Scrape Canadian law firm career pages.
+    UPDATED: Now points to specific 'Current Opportunities' or 'Lawyer' listing pages
+    to avoid generic landing pages.
+    """
     pages = [
-        "https://www.joinblakes.com/jobs/?orderby=date&order=desc",
-        "https://www.bennettjones.com/Careers",
-        "https://www.fasken.com/en/careers",
-        "https://gowlingwlg.com/en/careers/",
-        "https://www.stikeman.com/en/careers",
-        "https://www.dwpv.com/en/Careers",
-        "https://www.mccarthy.ca/en/careers",
-        "https://www.torys.com/en/careers",
-        "https://www.litigate.com/careers",
-        "https://www.goodmans.ca/careers/current-opportunities",
-        "https://www.blg.com/en/careers/legal-professionals/current-opportunities",
-        "https://www.dentons.com/en/careers",
-        "https://www.millerthomson.com/en/careers",
+        # Blakes (Associates specific)
+        "https://www.joinblakes.com/careers/associates/",
+        
+        # Bennett Jones (Legal Professionals)
+        "https://www.bennettjones.com/en/Careers/Legal-Professionals",
+        
+        # Fasken (Lawyers & Agents)
+        "https://www.fasken.com/en/careers/lawyers",
+        
+        # Gowling WLG (Current Opportunities)
+        "https://gowlingwlg.com/en/careers/current-opportunities/",
+        
+        # Stikeman Elliott (Legal Professionals)
+        "https://www.stikeman.com/en/careers/legal",
+        
+        # Davies (DWPV) (Lawyers)
+        "https://www.dwpv.com/en/Careers/Lawyers",
+        
+        # McCarthy Tetrault (Lawyers)
+        "https://www.mccarthy.ca/en/careers/lawyers",
+        
+        # Torys (Lawyers)
+        "https://www.torys.com/careers/lawyers",
+        
+        # Goodmans (Associates)
+        "https://www.goodmans.ca/careers/associates",
+        
+        # BLG (Current Opportunities)
+        "https://www.blg.com/en/careers/current-opportunities",
+        
+        # Miller Thomson (Lawyers)
+        "https://www.millerthomson.com/en/careers/lawyers/",
+        
+        # Cassels (Lateral Opportunities)
         "https://cassels.com/join-us/career-opportunities-lawyers/",
-        "https://www.airdberlis.com/join-us",
-        "https://www.lerners.ca/careers",
-        "https://www.blaney.com/careers",
+        
+        # Aird & Berlis (Current Opportunities)
+        "https://www.airdberlis.com/join-us/current-opportunities",
+        
+        # Lerners (Lawyers)
+        "https://www.lerners.ca/careers/lawyers/",
+        
+        # Lenczner Slaght (Lawyers)
+        "https://www.litigate.com/careers/lawyers",
+        
+        # Wildeboer Dellelce
+        "https://www.wildlaw.ca/careers/lawyers/",
+        
+        # Osler (Added - was missing)
+        "https://www.osler.com/en/careers/opportunities",
     ]
+    
+    # Note: Some firms (Norton Rose, Dentons) use pure JavaScript/Workday portals 
+    # that cannot be scraped by this simple script. They have been removed to prevent errors.
+    
     return _scrape_career_pages(pages, "LawFirm")
 
 
 def scrape_recruiter_sites() -> pd.DataFrame:
+    """
+    Scrape Canadian legal recruiter and job board sites.
+    UPDATED: Points to the actual search results/job board pages.
+    """
     pages = [
-        "https://www.zsa.ca/current-opportunities/?search_keywords=&search_location=",
-        "https://www.thecounselnetwork.com/",
-        "https://www.lifeafterlaw.com/",
-        "https://www.thehellergroup.ca/",
-        "https://www.smithlegalsearch.com/",
-        "https://cartelinc.com/",
-        "https://edgerecruitment.ca/",
-        "https://www.urbanlegal.ca/careers",
-        "https://www.legaljobs.ca/",
-        "https://www.cba.org/Careers",
+        # ZSA (General Job Board)
+        "https://www.zsa.ca/job-board/",
+        
+        # The Counsel Network (Job Search)
+        "https://thecounselnetwork.com/job-search/",
+        
+        # Life After Law (Opportunities)
+        "https://www.lifeafterlaw.com/opportunities",
+        
+        # The Heller Group (Opportunities)
+        "https://thehellergroup.ca/opportunities/",
+        
+        # Smith Legal Search
+        "https://www.smithlegalsearch.com/opportunities/",
+        
+        # Cartel Inc (Job Search)
+        "https://cartelinc.com/job-search/",
+        
+        # Edge Recruitment (Vacancies)
+        "https://edgerecruitment.ca/vacancies/",
+        
+        # Urban Legal (Opportunities)
+        "https://www.urbanlegal.ca/opportunities",
+        
+        # LegalJobs.ca (Direct listing)
+        "https://legaljobs.ca/jobs/",
+        
+        # Job Bank (Filtered for 'Lawyer' in Canada)
+        "https://www.jobbank.gc.ca/jobsearch/jobsearch?searchstring=lawyer&locationstring=",
+        
+        # Canadian Bar Association (Job Board)
+        "https://www.cba.org/r/Jobs/Home",
     ]
     return _scrape_career_pages(pages, "Recruiter")
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM / Email / Main
