@@ -108,12 +108,12 @@ def scrape_law_firm_sites() -> pd.DataFrame:
     # careers or opportunities sections of each firm.  Some sites may block
     # automated access; in that case the request will be skipped.
     firm_career_pages = [
-        "https://www.osler.com/en/careers/",  # Osler
-               "https://www.osler.com/en/careers/",  # Osler, Hoskin & Harcourt LLP
-        "https://www.blakes.com/careers/",  # Blake, Cassels & Graydon LLP
-        "https://www.bennettjones.com/Careers",  # Bennett Jones LLP
-        "https://www.fasken.com/en/careers",  # Fasken Martineau DuMoulin LLP
-        "https://gowlingwlg.com/en/careers/",  # Gowling WLG
+        "https://www.osler.com/en/careers/,  # Osler
+               "https://www.osler.com/en/careers/,  # Osler, Hoskin & Harcourt LLP
+        "https://www.blakes.com/careers/,  # Blake, Cassels & Graydon LLP
+        "https://www.bennettjones.com/Careers,  # Bennett Jones LLP
+        "https://www.fasken.com/en/careers,  # Fasken Martineau DuMoulin LLP
+        "https://gowlingwlg.com/en/careers/,  # Gowling WLG
         "https://www.stikeman.com/en/careers",  # Stikeman Elliott LLP
         "https://www.dwpv.com/en/Careers",  # Davies Ward Phillips & Vineberg LLP
         "https://www.mccarthy.ca/en/careers",  # McCarthy Tétrault LLP
