@@ -5,3 +5,6 @@ pandas>=1.5
 # Optional: used indirectly by jobspy for parsing and email creation
 beautifulsoup4
 openai>=1.0
+
+requests>=2.31.0
+lxml>=4.9.0
