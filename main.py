@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Weekly Law Associate Job Scraper (ON & AB Edition)
+Weekly Law Associate Job Scraper (Strict Clean Edition)
 
-Target:
-- Roles: Associates (0-2 Yrs) & Articling/Students.
-- Locations: STRICTLY Ontario & Alberta.
-- Features: Smart Scoring, Deep Crawl, Location Filtering.
+Fixes:
+- Removes generic "Info" pages (e.g., "Our Student Program", "Join Us").
+- Hard blocks "Mid-Level" and "Intermediate" roles.
+- Blocks "Our Team", "Profiles", and "Attorney Advertising" links.
+- Deduplicates jobs based on Title + Company (prevents Indeed/LinkedIn doubles).
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ import concurrent.futures
 from email.message import EmailMessage
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Set
 
 import pandas as pd
 import requests
@@ -47,35 +48,30 @@ _HEADERS = {
 RE_ASSOCIATE = re.compile(r"\b(associate|lawyer|counsel|juriste|avocat|attorney|solicitor)\b", re.IGNORECASE)
 RE_STUDENT   = re.compile(r"\b(articling|student|summer|clerk|stagiaire)\b", re.IGNORECASE)
 
-# --- 2. NEGATIVE TITLES ---
-RE_BLOCKED_TITLE = re.compile(r"\b(senior|partner|director|manager|vp|president|chair|head|principal|c-suite|executive|paralegal|assistant|clerk\s+typist|technician|driver|warehouse|sales|marketing|receptionist)\b", re.IGNORECASE)
+# --- 2. INSTANT REJECT (TITLES) ---
+# Removes Senior, Mid-Level, and non-legal roles
+RE_BLOCKED_TITLE = re.compile(r"\b(senior|partner|director|manager|vp|president|chair|head|principal|c-suite|executive|paralegal|assistant|clerk\s+typist|technician|driver|warehouse|sales|marketing|receptionist|mid-?level|intermediate)\b", re.IGNORECASE)
 
-# --- 3. EXPERIENCE FILTER ("Killers") ---
-# Rejects "5+ years", "3-5 years", "Senior Associate"
+# --- 3. "INFO PAGE" BLOCKER (NEW) ---
+# Removes navigation links that look like jobs but aren't.
+RE_NAV_LINKS = re.compile(r"^(our\s+team|profiles?|meet\s+our|join\s+us|careers?|student\s+programs?|summer\s+programs?|articling\s+programs?|recruitment|who\s+we\s+are|about\s+us|attorney\s+advertising|terms|privacy|search|menu|home|summer\s+recruitment|our\s+summer\s+students|articling)$", re.IGNORECASE)
+
+# --- 4. URL BLOCKLIST (NEW) ---
+# Blocks specific subfolders known to contain generic info
+RE_BAD_URLS = re.compile(r"(/who-we-are/|/our-team/|/profiles/|/people/|/attorney-advertising|students\.cassels\.com|/student-programs/|/articling-program|/summer-program)", re.IGNORECASE)
+
+# --- 5. EXPERIENCE FILTER ("Killers") ---
 RE_EXP_KILLER = re.compile(r"\b((?:minimum|at least|over)\s+)?(3|4|5|6|7|8|9|10)(\+|\s*(-|to)\s*\d+)?\s*years", re.IGNORECASE)
 RE_SENIOR_ROLE = re.compile(r"\b(senior|mid-level|intermediate)\s+associate", re.IGNORECASE)
 
-# --- 4. POSITIVE SCORING ---
-RE_JUNIOR = re.compile(r"\b(0-2|0\s*to\s*2|1-2|1\s*to\s*2|first|second)\s*years?", re.IGNORECASE)
-RE_ENTRY  = re.compile(r"\b(entry\s*level|junior|newly\s*called|recent\s*call|202[4-6]\s*call)", re.IGNORECASE)
-
-# --- 5. LOCATION FILTER (Ontario & Alberta) ---
-# Must match at least one of these cities/provinces in the text
+# --- 6. LOCATION FILTER (Ontario & Alberta) ---
 _LOCATIONS = [
-    # Provinces
     r"\bOntario\b", r"\bAlberta\b", r"\bAB\b", r"\bON\b",
-    # ON Cities
     r"\bToronto\b", r"\bOttawa\b", r"\bMississauga\b", r"\bBrampton\b", r"\bHamilton\b", 
     r"\bLondon\b", r"\bMarkham\b", r"\bVaughan\b", r"\bKitchener\b", r"\bWindsor\b", 
-    r"\bBurlington\b", r"\bSudbury\b", r"\bOshawa\b", r"\bBarrie\b", r"\bKingston\b", 
-    r"\bGuelph\b", r"\bWaterloo\b", r"\bThunder Bay\b", r"\bOakville\b", r"\bRichmond Hill\b",
-    # AB Cities
-    r"\bCalgary\b", r"\bEdmonton\b", r"\bRed Deer\b", r"\bLethbridge\b", r"\bSt\.? Albert\b",
-    r"\bMedicine Hat\b", r"\bGrande Prairie\b", r"\bAirdrie\b", r"\bFort McMurray\b"
+    r"\bCalgary\b", r"\bEdmonton\b", r"\bRed Deer\b", r"\bLethbridge\b", r"\bSt\.? Albert\b"
 ]
 RE_LOCATIONS = re.compile("|".join(_LOCATIONS), re.IGNORECASE)
-
-# Negative Locations (Stop "Vancouver" jobs from sneaking in via national firms)
 RE_BAD_LOCATIONS = re.compile(r"\b(Vancouver|British Columbia|BC|Montreal|Quebec|QC|Halifax|Nova Scotia)\b", re.IGNORECASE)
 
 
@@ -84,21 +80,35 @@ RE_BAD_LOCATIONS = re.compile(r"\b(Vancouver|British Columbia|BC|Montreal|Quebec
 # ─────────────────────────────────────────────────────────────────────────────
 
 class JobScorer:
-    """Analyzes job text to determine fit and location."""
-    
     @staticmethod
-    def score_job(title: str, description: str) -> tuple[bool, str, int]:
+    def score_job(title: str, description: str, url: str) -> tuple[bool, str, int]:
         title = str(title).strip()
         desc  = str(description).strip()
+        url   = str(url).lower()
         full_text = (title + " " + desc).lower()
         
-        score = 0
-        category = "Unknown"
+        # --- A. SANITY CHECKS (FAIL FAST) ---
+        
+        # 1. Check for "Nav Link" titles (e.g. "Join Us", "Our Team")
+        if RE_NAV_LINKS.search(title):
+            return False, "Nav Link", -100
+            
+        # 2. Check for Blocked URLs (e.g. /who-we-are/)
+        if RE_BAD_URLS.search(url):
+            return False, "Bad URL", -100
 
-        # A. TITLE CHECK
+        # 3. Check for Blocked Roles (Senior, Mid-Level, Admin)
         if RE_BLOCKED_TITLE.search(title):
-            return False, "Blocked", -100
+            return False, "Blocked Title", -100
+            
+        # 4. Check for Experience Killers (3-5 years, Mid-Level in desc)
+        if RE_EXP_KILLER.search(full_text) or RE_SENIOR_ROLE.search(full_text):
+            return False, "Too Senior", -100
 
+        # --- B. CATEGORIZATION ---
+        category = "Unknown"
+        score = 0
+        
         if RE_ASSOCIATE.search(title):
             category = "Associate"
             score += 10
@@ -108,25 +118,18 @@ class JobScorer:
         else:
             return False, "Not Legal", -100
 
-        # B. LOCATION CHECK
-        # 1. Must contain an ON/AB keyword
+        # --- C. LOCATION CHECK ---
+        # Must have ON/AB keyword OR be a remote/unspecified role on a firm site
+        # We are strict: must find location in text OR title
         if not RE_LOCATIONS.search(full_text):
-            return False, "Wrong Location", -100
-        
-        # 2. If it explicitly mentions bad locations (e.g. "Vancouver") AND NOT good ones nearby
-        # (This is tricky, so we rely on the positive check mostly. But if title says "Associate - Vancouver", kill it.)
-        if RE_BAD_LOCATIONS.search(title):
-            return False, "Wrong City in Title", -100
+            # If it explicitly says Vancouver/Montreal, kill it.
+            if RE_BAD_LOCATIONS.search(full_text):
+                return False, "Wrong Location", -100
+            # If no location found, we punish score but don't kill (might be inferred)
+            score -= 5
 
-        # C. EXPERIENCE CHECK ("The Killer")
-        if RE_EXP_KILLER.search(full_text) or RE_SENIOR_ROLE.search(full_text):
-            return False, "Too Senior", -100
-
-        # D. SCORING
-        if RE_JUNIOR.search(full_text): score += 20
-        if RE_ENTRY.search(full_text):  score += 15
-        
-        # Content Valid check
+        # --- D. CONTENT CHECK ---
+        # Real jobs usually have "Apply" or "Resume"
         if desc and "apply" not in full_text and "resume" not in full_text and "contact" not in full_text:
             score -= 5
 
@@ -135,7 +138,7 @@ class JobScorer:
 
 def get_session():
     s = requests.Session()
-    retry = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+    retry = Retry(total=2, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
     s.mount("https://", HTTPAdapter(max_retries=retry))
     s.headers.update(_HEADERS)
     return s
@@ -148,7 +151,7 @@ def clean_html(html: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. DIRECT SITE SCRAPER (Parallel)
+# 3. DIRECT SITE SCRAPER
 # ─────────────────────────────────────────────────────────────────────────────
 
 def scrape_site(url: str) -> List[dict]:
@@ -159,14 +162,13 @@ def scrape_site(url: str) -> List[dict]:
     domain = urlparse(url).netloc.replace("www.", "")
     
     print(f"  Scanning: {domain} ...")
-    pages_scraped = 0
-    MAX_PAGES = 2 
+    MAX_PAGES = 1 # Keep shallow to avoid wandering into blog posts
 
-    while queue and pages_scraped < MAX_PAGES:
+    while queue and MAX_PAGES > 0:
         curr = queue.pop(0)
         if curr in visited: continue
         visited.add(curr)
-        pages_scraped += 1
+        MAX_PAGES -= 1
 
         try:
             resp = session.get(curr, timeout=10)
@@ -174,35 +176,33 @@ def scrape_site(url: str) -> List[dict]:
             
             soup = BeautifulSoup(resp.text, "html.parser")
             
-            # Extract Links
             for a in soup.find_all("a", href=True):
                 text = a.get_text(" ", strip=True)
                 href = urljoin(curr, a["href"])
                 
-                # Basic Pre-filter
-                if len(text) < 4 or "javascript" in href: continue
+                # PRE-FILTER: Don't even visit if it looks like junk
+                if len(text) < 4 or RE_NAV_LINKS.search(text) or RE_BAD_URLS.search(href):
+                    continue
                 
-                # Check Title Match
+                # TITLE MATCH
                 if (RE_ASSOCIATE.search(text) or RE_STUDENT.search(text)) and not RE_BLOCKED_TITLE.search(text):
                     if href not in visited:
-                        # DEEP DIVE: Visit the link to check Location & Description
                         try:
+                            # DEEP DIVE
                             job_resp = session.get(href, timeout=8)
                             if job_resp.status_code == 200:
                                 desc = clean_html(job_resp.text)
-                                is_fit, category, score = JobScorer.score_job(text, desc)
+                                is_fit, category, score = JobScorer.score_job(text, desc, href)
                                 
                                 if is_fit:
                                     found_jobs.append({
                                         "TITLE": text,
                                         "COMPANY": domain.split('.')[0].title(),
                                         "URL": href,
-                                        "CATEGORY": category,
-                                        "SCORE": score
+                                        "CATEGORY": category
                                     })
                                     visited.add(href)
                         except: pass
-
         except Exception: pass
 
     return found_jobs
@@ -220,21 +220,18 @@ def run_direct_scrape(urls: List[str]) -> pd.DataFrame:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. AGGREGATOR SCRAPER (Specific Locations)
+# 4. AGGREGATOR SCRAPER
 # ─────────────────────────────────────────────────────────────────────────────
 
 def scrape_jobspy_wrapper() -> pd.DataFrame:
     if scrape_jobs is None: return pd.DataFrame()
     
-    print("  Scraping Aggregators (Indeed/LinkedIn/Google) for ON & AB...")
+    print("  Scraping Aggregators (ON & AB)...")
     search_term = "lawyer associate"
-    
-    # We run two separate scrapes to force the engine to filter by province
     locations = ["Ontario, Canada", "Alberta, Canada"]
     all_rows = []
 
     for loc in locations:
-        print(f"    -> Querying {loc}...")
         try:
             jobs = scrape_jobs(
                 site_name=["indeed", "linkedin", "google"],
@@ -254,28 +251,28 @@ def scrape_jobspy_wrapper() -> pd.DataFrame:
                     title = str(row.get("TITLE", ""))
                     desc  = str(row.get("DESCRIPTION", ""))
                     url   = str(row.get("JOB_URL", ""))
+                    company = str(row.get("COMPANY", ""))
                     
-                    is_fit, category, score = JobScorer.score_job(title, desc)
+                    is_fit, category, _ = JobScorer.score_job(title, desc, url)
                     if is_fit:
                         all_rows.append({
                             "TITLE": title,
-                            "COMPANY": row.get("COMPANY"),
+                            "COMPANY": company,
                             "URL": url,
-                            "CATEGORY": category,
-                            "SCORE": score
+                            "CATEGORY": category
                         })
-            time.sleep(2) # Polite delay between location queries
-        except Exception as e:
-            print(f"    Error scraping {loc}: {e}")
+            time.sleep(2)
+        except Exception: pass
 
     return pd.DataFrame(all_rows)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. TARGET URLS
+# 5. UTILS
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_target_urls():
+    # Only "Current Opportunities" specific pages
     return [
         "https://www.joinblakes.com/careers/associates/",
         "https://www.bennettjones.com/en/Careers/Legal-Professionals",
@@ -299,9 +296,34 @@ def get_target_urls():
         "https://legaljobs.ca/jobs/",
     ]
 
+def deduplicate_jobs(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Deduplicates based on Title + Company (fuzzy match) AND URL.
+    This prevents the same job appearing from Indeed AND LinkedIn.
+    """
+    if df.empty: return df
+    
+    # 1. Create a "Signature" for each job
+    # e.g. "AssociatelawyerOsler"
+    def make_sig(row):
+        t = re.sub(r'\W+', '', str(row['TITLE']).lower())
+        c = re.sub(r'\W+', '', str(row['COMPANY']).lower())
+        return f"{t}_{c}"
+
+    df['SIG'] = df.apply(make_sig, axis=1)
+    
+    # 2. Drop duplicates based on Signature (keeping first)
+    df = df.drop_duplicates(subset=['SIG'])
+    
+    # 3. Drop duplicates based on URL (just in case)
+    df['CLEAN_URL'] = df['URL'].apply(lambda x: str(x).split('?')[0])
+    df = df.drop_duplicates(subset=['CLEAN_URL'])
+    
+    return df.drop(columns=['SIG', 'CLEAN_URL'])
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. MAIN & EMAIL
+# 6. MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
 def send_email(df: pd.DataFrame):
@@ -345,25 +367,18 @@ def send_email(df: pd.DataFrame):
 
 def main():
     print("="*60)
-    print("Law Scraper (ON & AB Only | 0-2 Years)")
+    print("Strict Law Scraper (ON/AB | Clean Output)")
     print("="*60)
 
     # 1. SCRAPE
     df_direct = run_direct_scrape(get_target_urls())
     df_agg    = scrape_jobspy_wrapper()
 
-    # 2. COMBINE
+    # 2. COMBINE & DEDUPLICATE
     combined = pd.concat([df_direct, df_agg], ignore_index=True, sort=False)
-    
-    if combined.empty:
-        print("No jobs found.")
-        return
+    unique_jobs = deduplicate_jobs(combined)
 
-    # 3. DEDUPLICATE
-    combined["CLEAN_URL"] = combined["URL"].apply(lambda x: str(x).split('?')[0])
-    combined = combined.drop_duplicates(subset=["CLEAN_URL"])
-
-    # 4. HISTORY CHECK
+    # 3. HISTORY CHECK
     history_file = "job_history.json"
     if os.path.exists(history_file):
         with open(history_file, 'r') as f:
@@ -371,15 +386,22 @@ def main():
     else:
         history_ids = set()
 
-    new_jobs = combined[~combined["CLEAN_URL"].isin(history_ids)].copy()
+    # We check history against the URL
+    final_jobs = []
+    for _, row in unique_jobs.iterrows():
+        clean_url = row['URL'].split('?')[0]
+        if clean_url not in history_ids:
+            final_jobs.append(row)
+            history_ids.add(clean_url)
+    
+    final_df = pd.DataFrame(final_jobs)
 
-    # 5. OUTPUT
-    print(f"\nFinal Verified Jobs: {len(new_jobs)}")
-    if not new_jobs.empty:
-        print(new_jobs[["TITLE", "COMPANY", "CATEGORY"]].to_string())
-        send_email(new_jobs)
+    # 4. OUTPUT
+    print(f"\nFinal Verified Jobs: {len(final_df)}")
+    if not final_df.empty:
+        print(final_df[["TITLE", "COMPANY", "CATEGORY"]].to_string())
+        send_email(final_df)
         
-        history_ids.update(new_jobs["CLEAN_URL"].tolist())
         with open(history_file, 'w') as f:
             json.dump(list(history_ids), f)
     else:
