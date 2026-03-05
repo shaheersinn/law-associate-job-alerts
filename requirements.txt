@@ -1,0 +1,5 @@
+python-jobspy>=1.1.79
+pandas>=1.5
+beautifulsoup4>=4.12
+requests>=2.31.0
+lxml>=4.9.0
