@@ -239,7 +239,7 @@ def scrape_jobspy_wrapper() -> pd.DataFrame:
     search_term = "lawyer associate"
     locations   = ["Ontario, Canada", "Alberta, Canada"]
     # FIX: was hardcoded to 30; now reads the env var as originally intended
-    results_wanted = int(os.environ.get("RESULTS_WANTED", "30"))
+    results_wanted = int(os.environ.get("RESULTS_WANTED") or "30")
     all_rows = []
 
     for loc in locations:
