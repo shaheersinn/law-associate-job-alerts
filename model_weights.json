@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "training_runs": 0,
+  "last_trained": null,
+  "score_threshold": 5,
+  "keyword_weights": {
+    "associate": 10,
+    "lawyer": 8,
+    "counsel": 7,
+    "attorney": 8,
+    "solicitor": 6,
+    "juriste": 6,
+    "articling": 5,
+    "student": 4,
+    "summer": 3
+  },
+  "site_productivity": {},
+  "run_history": [],
+  "total_jobs_found": 0
+}
