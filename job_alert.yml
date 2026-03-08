@@ -1,39 +1,37 @@
 name: Law Associate Job Alerts
 
 on:
-  # ── Run every 2 hours ──────────────────────────────────────────────────────
   schedule:
-    - cron: '0 */2 * * *'
-  # ── Manual trigger ─────────────────────────────────────────────────────────
+    - cron: '0 */2 * * *'   # every 2 hours
   workflow_dispatch:
 
 permissions:
-  contents: write   # needed to commit results.json & model_weights.json back
+  contents: write            # needed to git-commit results.json + model_weights.json
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 2. Python ────────────────────────────────────────────────────────
+      # ── 2. Python ────────────────────────────────────────────────────────────
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ── 3. Install deps ──────────────────────────────────────────────────
+      # ── 3. Install dependencies ───────────────────────────────────────────────
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ── 4. Restore caches (job history + model weights) ──────────────────
+      # ── 4. Restore caches (FIXED: separate restore step avoids cache conflict) ─
       - name: Restore job history cache
         id: cache-history
         uses: actions/cache/restore@v4
@@ -52,7 +50,7 @@ jobs:
           restore-keys: |
             model-weights-${{ runner.os }}-
 
-      # ── 5. Run scraper ────────────────────────────────────────────────────
+      # ── 5. Run scraper ────────────────────────────────────────────────────────
       - name: Run job alert script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -61,9 +59,10 @@ jobs:
           HISTORY_FILE:       job_history.json
           WEIGHTS_FILE:       model_weights.json
           RESULTS_FILE:       results.json
+          DASHBOARD_URL:      https://law-associate-job-alerts.vercel.app/
         run: python main.py
 
-      # ── 6. Save caches (FIX: use separate save step to avoid conflict) ────
+      # ── 6. Save caches (FIXED: separate save step avoids conflict) ────────────
       - name: Save job history cache
         if: always()
         uses: actions/cache/save@v4
@@ -78,13 +77,13 @@ jobs:
           path: model_weights.json
           key: model-weights-${{ runner.os }}-${{ github.run_number }}
 
-      # ── 7. Commit results.json + model_weights.json back to repo ──────────
-      #       This makes data available to the Vercel dashboard via GitHub raw
+      # ── 7. Commit results + weights back to repo (feeds the Vercel dashboard) ─
       - name: Commit updated results to repo
         if: always()
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add results.json model_weights.json || true
-          git diff --cached --quiet || git commit -m "chore: update results & model weights [skip ci]"
+          git diff --cached --quiet || git commit -m "chore: update results & weights [skip ci]"
           git push || true
+
