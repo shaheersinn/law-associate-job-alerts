@@ -3,5 +3,6 @@
   "total_all_time": 0,
   "training_runs": 0,
   "score_threshold": 5,
+  "site_productivity": {},
   "runs": []
 }
