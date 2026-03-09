@@ -279,7 +279,7 @@ def train_model(
             if word in title:
                 kw[word] = min(kw[word] + 1, 20)
 
-    # Keyword decay — reduce weight of keywords absent from this run's results by 3 %
+    # Keyword decay — reduce weight of keywords absent from this run's results by 3%
     DECAY_FACTOR = 0.97
     seen_words = {
         word for job in jobs_found
@@ -799,7 +799,7 @@ LEVER_BOARDS = [
     # Additional Canadian firms
     ("mcmillan",           "McMillan LLP"),
     ("blg",                "BLG"),
-    ("bordenladdner",      "Borden Ladner Gervais"),
+    ("bordenladner",       "Borden Ladner Gervais"),
     ("langloismishkin",    "Langlois Lawyers"),
     ("crawleylaw",         "Crawley MacKewn Brush"),
     ("fogler",             "Fogler Rubinoff"),
@@ -1092,9 +1092,9 @@ def get_target_urls() -> List[str]:
         "https://www.brauti.com/careers/",
         "https://www.fasken.com/en/careers/students",  # Articling students page
         # Additional Ontario boutiques
+        # Note: lerners.ca was previously removed due to ReadTimeout — not re-added
         "https://www.mcmillan.ca/careers/",            # McMillan LLP
         "https://www.blg.com/en/careers/articling",    # BLG Articling
-        "https://www.lerners.ca/careers/",             # Lerners LLP (London ON)
         "https://www.fogler.com/careers/",             # Fogler Rubinoff
         "https://www.lacourselaw.ca/careers/",         # La Course Law
         "https://www.lax.ca/careers/",                 # Lax O'Sullivan Lisus Gottlieb
@@ -1324,10 +1324,17 @@ def apply_freshness_filter(df: pd.DataFrame, max_days: int = 40) -> pd.DataFrame
         date_str = str(row.get("DATE", "")).strip()
         if date_str and date_str not in ("", "nan", "None", "NaT"):
             parsed = None
-            for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%SZ", "%B %d, %Y", "%b %d, %Y",
-                        "%d %B %Y", "%Y/%m/%d"):
+            # Try ISO date prefix first (most common), then full-text formats
+            short = date_str[:10]
+            for fmt, sample in [
+                ("%Y-%m-%d",  short),
+                ("%Y/%m/%d",  short),
+                ("%d %B %Y",  date_str),
+                ("%B %d, %Y", date_str),
+                ("%b %d, %Y", date_str),
+            ]:
                 try:
-                    parsed = datetime.strptime(date_str[:10], fmt[:len(date_str[:10])])
+                    parsed = datetime.strptime(sample, fmt)
                     break
                 except ValueError:
                     continue
@@ -1460,7 +1467,8 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
 
     if not associates.empty:
         lines.append("\n<b>🏛 ASSOCIATES / LAWYERS</b>")
-        for _, row in associates.sort_values("SCORE", ascending=False).iterrows():
+        sort_col = "SCORE" if "SCORE" in associates.columns else associates.columns[0]
+        for _, row in associates.sort_values(sort_col, ascending=False, na_position="last").iterrows():
             lines.append("• " + _fmt_job_line(row))
 
     if not students.empty:
