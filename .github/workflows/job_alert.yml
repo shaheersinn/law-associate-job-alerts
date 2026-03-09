@@ -33,12 +33,22 @@ jobs:
           restore-keys: |
             job-history-
 
+      # Restore cached model weights so training accumulates across runs
+      - name: Restore model weights cache
+        uses: actions/cache@v3
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}
+          restore-keys: |
+            model-weights-
+
       - name: Run job alert script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           RESULTS_WANTED:     ${{ secrets.RESULTS_WANTED }}
           HISTORY_FILE:       job_history.json
+          WEIGHTS_FILE:       model_weights.json
         run: |
           python main.py
 
@@ -49,3 +59,11 @@ jobs:
         with:
           path: job_history.json
           key: job-history-${{ runner.os }}
+
+      # Save updated model weights for next run
+      - name: Save model weights cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}
