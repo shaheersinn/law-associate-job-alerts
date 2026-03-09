@@ -33,6 +33,15 @@ jobs:
           restore-keys: |
             job-history-
 
+      # Restore adaptive model weights so training accumulates across runs
+      - name: Restore model weights cache
+        uses: actions/cache@v3
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}
+          restore-keys: |
+            model-weights-
+
       - name: Run job alert script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -49,3 +58,11 @@ jobs:
         with:
           path: job_history.json
           key: job-history-${{ runner.os }}
+
+      # Save updated model weights so the adaptive model persists across runs
+      - name: Save model weights cache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}
