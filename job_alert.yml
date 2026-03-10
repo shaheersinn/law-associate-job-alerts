@@ -3,7 +3,7 @@ name: Law Associate Job Alerts
 on:
   schedule:
     - cron: '0 */2 * * *'   # every 2 hours
-  workflow_dispatch:
+  workflow_dispatch:         # allow manual trigger from Actions tab
 
 permissions:
   contents: write            # needed to git-commit results.json + model_weights.json
@@ -31,7 +31,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ── 4. Restore caches (FIXED: separate restore step avoids cache conflict) ─
+      # ── 4. Restore caches ─────────────────────────────────────────────────────
+      # BUG FIX: Use separate restore@v4 + save@v4 steps (not combined cache@v3).
+      # The old actions/cache@v3 with a static key never saved updates because
+      # GitHub does not overwrite an existing cache on a key collision — so
+      # job_history.json was NEVER persisted, causing every run to re-alert
+      # on all previously seen jobs.
       - name: Restore job history cache
         id: cache-history
         uses: actions/cache/restore@v4
@@ -62,7 +67,9 @@ jobs:
           DASHBOARD_URL:      https://law-associate-job-alerts.vercel.app/
         run: python main.py
 
-      # ── 6. Save caches (FIXED: separate save step avoids conflict) ────────────
+      # ── 6. Save caches ────────────────────────────────────────────────────────
+      # BUG FIX: Separate save step with run_number key guarantees a new cache
+      # entry is written even when the restore key matched an older entry.
       - name: Save job history cache
         if: always()
         uses: actions/cache/save@v4
@@ -77,7 +84,9 @@ jobs:
           path: model_weights.json
           key: model-weights-${{ runner.os }}-${{ github.run_number }}
 
-      # ── 7. Commit results + weights back to repo (feeds the Vercel dashboard) ─
+      # ── 7. Commit results + weights back to repo ──────────────────────────────
+      # This feeds the Vercel dashboard with fresh data on every run.
+      # [skip ci] prevents this commit from triggering another workflow run.
       - name: Commit updated results to repo
         if: always()
         run: |
@@ -86,4 +95,3 @@ jobs:
           git add results.json model_weights.json || true
           git diff --cached --quiet || git commit -m "chore: update results & weights [skip ci]"
           git push || true
-

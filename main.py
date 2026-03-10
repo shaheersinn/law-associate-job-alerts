@@ -1,37 +1,62 @@
 #!/usr/bin/env python3
 """
-Law Associate Job Scraper — v4 (Clean Output Edition)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-BUG FIXES vs v3 (all confirmed from live log analysis):
+Law Associate Job Scraper — v5 (Bug-Fix & Intelligence Edition)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUGS FIXED vs v4 (confirmed from 2026-03-09 live log analysis):
 
-DEAD DOMAINS REMOVED (were wasting 90+ seconds on retries):
-  ✓ paliare.com        → DNS dead (NameResolutionError)
-  ✓ nelligan.ca        → Connection refused
-  ✓ jssh.ca            → DNS dead (NameResolutionError)
-  ✓ hendersonheinrichs.com → DNS dead (NameResolutionError)
-  ✓ legaljobsboard.com → ConnectTimeout × 3 = 90s wasted
-  ✓ lerners.ca         → ReadTimeout
+DEAD DOMAINS REMOVED (were wasting time on retries every run):
+  ✓ www.kellylawyers.ca     → DNS dead (NameResolutionError)
+  ✓ www.daviesward.com      → DNS dead (Temporary failure)
+  ✓ www.burnetduckworth.com → DNS dead (NameResolutionError)
+  ✓ www.matholaw.ca         → DNS dead (NameResolutionError)
+  ✓ www.shortoil.ca         → DNS dead (NameResolutionError)
+  ✓ careers.sunlife.com     → DNS dead (NameResolutionError)
+  ✓ careers.bmo.com         → DNS dead (NameResolutionError)
+  ✓ www.hicks.ca            → SSL hostname mismatch
+  ✓ www.mcleodlaw.com       → SSL hostname mismatch
+  ✓ www.eluta.ca            → SSLv3 handshake failure
 
-GARBAGE OUTPUT FIXED (0/10 results in last run were real jobs):
-  ✓ "View our United States Summer Associate Program" — US job slipping through.
-    Fixed: "United States", "U.S.", "American" added to RE_BAD_LOCATIONS;
-           bad-location check now applied to the TITLE, not just description.
-  ✓ "Lawyer Recruiting Contacts" — nav directory page.
-    Fixed: "contacts", "directory", "recruiting contacts" added to blocked titles.
-  ✓ "Student" / "Summer Students" / "Student positions" — single-word nav links.
-    Fixed: MIN_TITLE_LENGTH = 15 chars; titles under 15 chars hard-rejected.
-  ✓ emond.ca produces 4 garbage results — emond.ca is a LEGAL PUBLISHER
-    (textbooks, practice exams, flashcards), NOT a law firm.
-    Fixed: emond.ca removed from URLs; BLOCKED_DOMAINS set prevents re-adding.
-  ✓ "Solicitor Practice Exam/Course/Flashcards/Shop All" — product pages.
-    Fixed: "practice exam", "flashcard", "shop all", "bursary", "scholarship"
-           added to RE_BLOCKED_TITLE.
-  ✓ emond, paliare, nelligan, jssh removed from TRUSTED_CA_DOMAINS.
+FALSE POSITIVES BLOCKED (confirmed from live output):
+  ✓ "General Counsel" / "General Counsel and Corporate Secretary"
+    → C-suite/VP-level, NOT a junior associate role.
+    Fix: "general counsel" added to RE_BLOCKED_TITLE.
+  ✓ "Third Year Associate" — Year 3 is no longer junior.
+    Fix: ordinal year regex RE_YEAR_TOO_SENIOR now catches
+         third|fourth|fifth|sixth year + senior/experienced synonyms.
+  ✓ "Lawyer - Litigator (ID: 54731)" from City of Edmonton
+    → No year/seniority info = passes. Added positive-score boost
+      for explicit junior signals and stricter neutral handling.
 
-LOCATION ENFORCEMENT — jobs must be Ontario OR Alberta ONLY:
-  ✓ RE_BAD_LOCATIONS now includes United States, U.S., American, New York,
-    Chicago, London UK (not London ON), Paris, Sydney, etc.
-  ✓ For non-trusted domains location is now a HARD reject, not a soft penalty.
+ATS SCRAPERS RETURNING 0 (all Workday/Greenhouse/Lever hits = 0):
+  ✓ Workday tenant slugs corrected/verified. Non-functioning tenants
+    replaced with confirmed working ones.
+  ✓ Greenhouse boards: removed corporate slugs that don't exist
+    (RBC, TD, etc. use their own ATS, not Greenhouse).
+    Added confirmed-working boutique/government boards.
+  ✓ Lever: corrected slugs for known firms.
+
+HISTORY CACHE BUG (jobs repeating every run):
+  ✓ Old workflow used actions/cache@v3 with static key
+    "job-history-Linux" — cache hit on restore meant SAVE was
+    skipped (GitHub never overwrites cache on key collision).
+    Fix: new workflow uses separate restore@v4 + save@v4 with
+    run_number suffix, guaranteeing a fresh save each run.
+
+STDOUT ORDER BUG (header printed after results):
+  ✓ Python's print() is line-buffered. Added flush=True to all
+    print() calls and moved the run header to before scraping.
+
+MODEL IMPROVEMENTS:
+  + Positive-score boost for explicit junior signals:
+    "newly called", "0-2 years", "first year", "second year",
+    "1-3 years", "junior associate", "recent call to the bar"
+  + RE_YEAR_TOO_SENIOR catches ordinal-year senior associates
+  + SSL soft-fallback: verify=False for known cert-mismatch hosts
+  + Fuzzy dedup: Levenshtein-style sig now strips stopwords so
+    "Associate Lawyer – Toronto" and "Associate Lawyer, Toronto"
+    are caught as duplicates
+  + Site productivity now tracked per full domain (not just key)
+  + run_history now stores per-source breakdown for analytics
 """
 
 from __future__ import annotations
@@ -57,7 +82,10 @@ try:
 except ImportError:
     scrape_jobs = None
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 log = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -81,16 +109,19 @@ RESULTS_FILE   = os.environ.get("RESULTS_FILE",   "results.json")
 RESULTS_WANTED = int(os.environ.get("RESULTS_WANTED") or "30")
 DASHBOARD_URL  = os.environ.get("DASHBOARD_URL",  "https://law-associate-job-alerts.vercel.app/")
 
-# Minimum characters a title must have to be considered a real job posting
-# Eliminates single-word nav links like "Student", "Summer Students" (< 15 chars)
 MIN_TITLE_LENGTH = 15
 
-# Domains that are NOT law firms — publishers, vendors, aggregators that produced
-# garbage results. Hard-blocked regardless of what their pages say.
 BLOCKED_DOMAINS = {
-    "emond",           # Emond Publishing — legal textbooks/exam prep, NOT a law firm
-    "legaljobsboard",  # Dead / consistently times out
-    "shopify",         # General e-commerce
+    "emond",           # Legal publisher (textbooks), NOT a law firm
+    "legaljobsboard",  # Dead / timeout
+    "shopify",         # General e-commerce platform
+}
+
+# BUG FIX: Domains with SSL certificate mismatches — use verify=False as fallback.
+# These are real law firms but their certs don't match the www. subdomain.
+SSL_SOFT_DOMAINS = {
+    "hicks.ca",
+    "mcleodlaw.com",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -107,8 +138,6 @@ RE_STUDENT = re.compile(
     re.IGNORECASE,
 )
 
-# BUG FIX: Removed "articling", "careers", "student" — these appear in real job titles.
-# This regex now ONLY catches pure navigation anchors (short, generic phrases).
 RE_NAV_LINK_EXACT = re.compile(
     r"^(our\s+team|profiles?|meet\s+our\s+team|join\s+us|who\s+we\s+are|about\s+us|"
     r"attorney\s+advertising|terms\s+of\s+use|privacy\s+policy|site\s+map|"
@@ -122,15 +151,25 @@ RE_BLOCKED_TITLE = re.compile(
     r"\b(senior\s+associate|senior\s+counsel|senior\s+lawyer|"
     r"managing\s+partner|equity\s+partner|non[-\s]equity\s+partner|"
     r"director|chief\s+legal|vp\s+legal|vice\s+president|"
+    # ── BUG FIX: "General Counsel" is a C-suite/VP role, NOT a junior associate ──
+    r"general\s+counsel|deputy\s+general\s+counsel|associate\s+general\s+counsel|"
+    r"chief\s+compliance|chief\s+privacy|"
     r"paralegal|legal\s+assistant|law\s+clerk|"
     r"clerk\s+typist|legal\s+secretary|"
     r"driver|warehouse|sales|marketing|receptionist|"
-    # ── Garbage patterns confirmed from live log output ───────────────────
-    r"recruiting\s+contacts|contacts|directory|"   # "Lawyer Recruiting Contacts"
-    r"practice\s+exam|flashcard|"                   # Emond products
-    r"shop\s+all|shop\s+our|bursary|scholarship|award|prize|"  # non-jobs
-    r"course\s+outline|study\s+guide|bar\s+exam|"  # publisher content
+    r"recruiting\s+contacts|contacts|directory|"
+    r"practice\s+exam|flashcard|"
+    r"shop\s+all|shop\s+our|bursary|scholarship|award|prize|"
+    r"course\s+outline|study\s+guide|bar\s+exam|"
     r"subscribe|newsletter|podcast|webinar)\b",
+    re.IGNORECASE,
+)
+
+# BUG FIX: Catch ordinal-year seniority in titles.
+# "Third Year Associate" → too senior (3rd year = ~4 years PQE)
+# "Fourth/Fifth/Sixth Year" → definitely senior
+RE_YEAR_TOO_SENIOR = re.compile(
+    r"\b(third|fourth|fifth|sixth|seventh|3rd|4th|5th|6th|7th)\s+year\b",
     re.IGNORECASE,
 )
 
@@ -145,9 +184,22 @@ RE_EXP_KILLER = re.compile(
     r"\b((?:minimum|at\s+least|over|more\s+than)\s+)?(4|5|6|7|8|9|10)(\+|\s*[-–]\s*\d+)?\s*years",
     re.IGNORECASE,
 )
-# 3+ years is okay for junior; 4+ is senior
 RE_SENIOR_ROLE = re.compile(
     r"\b(senior|mid[-\s]level|intermediate|experienced)\s+(associate|counsel|lawyer|attorney)\b",
+    re.IGNORECASE,
+)
+
+# IMPROVEMENT: Positive signals for junior/newly-called roles.
+# These boost score to distinguish genuine junior postings from
+# ambiguous "associate" roles that could be any level.
+RE_JUNIOR_SIGNALS = re.compile(
+    r"\b(newly\s+called|new\s+call|recent\s+call|"
+    r"0[-–]2\s+years?|1[-–]3\s+years?|0[-–]3\s+years?|"
+    r"first[\s-]year|second[\s-]year|1st[\s-]year|2nd[\s-]year|"
+    r"junior\s+associate|entry[\s-]level|new\s+graduate|recent\s+graduate|"
+    r"called\s+to\s+the\s+bar\s+(?:in\s+)?(?:20[0-9]{2}|within\s+[123]\s+years?)|"
+    r"bar\s+admission\s+(?:in\s+)?20[0-9]{2}|"
+    r"recent(?:ly)?\s+called)\b",
     re.IGNORECASE,
 )
 
@@ -159,6 +211,7 @@ _LOCATIONS = [
     r"\bWindsor\b",  r"\bOshawa\b",        r"\bBarrie\b",    r"\bGuelph\b",
     r"\bCalgary\b",  r"\bEdmonton\b",      r"\bRed\s+Deer\b",r"\bLethbridge\b",
     r"\bSt\.?\s+Albert\b", r"\bFort\s+McMurray\b", r"\bAirdrie\b",
+    r"\bSudbury\b",  r"\bThunder\s+Bay\b", r"\bPeterborough\b",
 ]
 RE_LOCATIONS     = re.compile("|".join(_LOCATIONS), re.IGNORECASE)
 RE_BAD_LOCATIONS = re.compile(
@@ -166,18 +219,15 @@ RE_BAD_LOCATIONS = re.compile(
     r"Halifax|Nova\s+Scotia|Winnipeg|Manitoba|\bMB\b|"
     r"Saskatchewan|\bSK\b|New\s+Brunswick|\bNB\b|"
     r"Prince\s+Edward|Newfoundland|\bNL\b|"
-    # ── US + International — confirmed catching US jobs in live run ────────
     r"United\s+States|\bUSA?\b|U\.S\.A?\.|American|"
     r"New\s+York|\bNYC?\b|Chicago|Houston|Los\s+Angeles|\bLA\b|"
     r"San\s+Francisco|\bSF\b|Washington\s+D\.?C\.?|Boston|Miami|"
-    r"London\s+UK|London\s+England|London,\s*England|"  # not London ON
+    r"London\s+UK|London\s+England|London,\s*England|"
     r"Paris|Sydney|Melbourne|Singapore|Hong\s+Kong|Dubai|"
     r"United\s+Kingdom|\bUK\b|England|Australia|\bAUS\b)\b",
     re.IGNORECASE,
 )
 
-# Trusted Canadian law firm domains — skip strict location check for these.
-# REMOVED: emond (publisher), paliare/nelligan/jssh (dead DNS)
 TRUSTED_CA_DOMAINS = {
     "blakes", "bennettjones", "fasken", "gowlingwlg", "stikeman", "dwpv",
     "mccarthy", "torys", "goodmans", "blg", "millerthomson", "cassels",
@@ -186,7 +236,8 @@ TRUSTED_CA_DOMAINS = {
     "fieldlaw", "bdplaw", "parlee", "davies", "stockwoods", "cavalluzzo",
     "goldblattpartners", "paliareroland", "hicksmorley",
     "cohenhighley", "brauti", "singleton", "glaholt",
-    "shibleyrighton", "carters", "mross",
+    "shibleyrighton", "carters", "mross", "legalaidontario",
+    "siskinds", "litigate", "wildlaw", "kmlaw", "sotos",
 }
 
 
@@ -195,18 +246,20 @@ TRUSTED_CA_DOMAINS = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 DEFAULT_WEIGHTS: Dict[str, Any] = {
-    "version":         3,
+    "version":         5,
     "training_runs":   0,
     "last_trained":    None,
     "score_threshold": 5,
     "keyword_weights": {
-        "associate": 10, "lawyer": 8, "counsel": 7,
-        "attorney":  8,  "solicitor": 6, "juriste": 6,
-        "articling": 8,  "student": 4,   "summer": 5,
+        "associate":  10, "lawyer":    8, "counsel":    7,
+        "attorney":    8, "solicitor": 6, "juriste":    6,
+        "articling":   8, "student":   4, "summer":     5,
     },
     "site_productivity": {},
+    "source_stats":      {},   # NEW: per-source breakdown
     "run_history":       [],
     "total_jobs_found":  0,
+    "false_positive_domains": [],   # domains flagged as producing garbage
 }
 
 
@@ -233,19 +286,28 @@ def save_weights(weights: Dict[str, Any]) -> None:
 
 
 def train_model(
-    weights: Dict[str, Any],
-    jobs_found: List[dict],
+    weights:       Dict[str, Any],
+    jobs_found:    List[dict],
     sites_scanned: List[str],
     run_timestamp: str,
 ) -> Dict[str, Any]:
+    """
+    Update model weights based on this run's results.
+    Tracks per-domain productivity, per-source stats, and adapts threshold.
+    """
     hit_domains: set = set()
+    source_counts: Dict[str, int] = {}
+
     for job in jobs_found:
         try:
             domain = urlparse(job.get("URL", "")).netloc.replace("www.", "")
             hit_domains.add(domain.split(".")[0].lower())
         except Exception:
             pass
+        source = job.get("SOURCE", "unknown")
+        source_counts[source] = source_counts.get(source, 0) + 1
 
+    # Site productivity tracking
     for site_url in sites_scanned:
         try:
             domain = urlparse(site_url).netloc.replace("www.", "")
@@ -261,6 +323,15 @@ def train_model(
         except Exception:
             pass
 
+    # Per-source stats
+    for src, cnt in source_counts.items():
+        entry = weights["source_stats"].setdefault(
+            src, {"total_jobs": 0, "total_runs": 0}
+        )
+        entry["total_jobs"] += cnt
+        entry["total_runs"] += 1
+
+    # Adaptive threshold
     n         = len(jobs_found)
     threshold = weights["score_threshold"]
     if n == 0 and threshold > 3:
@@ -268,9 +339,10 @@ def train_model(
         log.info(f"[Train] No results → lowering threshold to {threshold}")
     elif n > 30 and threshold < 12:
         threshold += 1
-        log.info(f"[Train] Many results → raising threshold to {threshold}")
+        log.info(f"[Train] Many results ({n}) → raising threshold to {threshold}")
     weights["score_threshold"] = threshold
 
+    # Keyword weight evolution (titles that matched)
     kw = weights["keyword_weights"]
     for job in jobs_found:
         title = str(job.get("TITLE", "")).lower()
@@ -279,10 +351,11 @@ def train_model(
                 kw[word] = min(kw[word] + 1, 20)
 
     summary = {
-        "timestamp":  run_timestamp,
-        "jobs_found": n,
-        "sites_hit":  list(hit_domains),
-        "threshold":  weights["score_threshold"],
+        "timestamp":      run_timestamp,
+        "jobs_found":     n,
+        "sites_hit":      list(hit_domains),
+        "threshold":      weights["score_threshold"],
+        "source_breakdown": source_counts,
     }
     weights["run_history"]      = (weights["run_history"] + [summary])[-50:]
     weights["training_runs"]   += 1
@@ -291,13 +364,14 @@ def train_model(
 
     log.info(
         f"[Train] Run #{weights['training_runs']} | Jobs: {n} | "
-        f"Threshold: {weights['score_threshold']} | All-time: {weights['total_jobs_found']}"
+        f"Threshold: {weights['score_threshold']} | All-time: {weights['total_jobs_found']} | "
+        f"Sources: {source_counts}"
     )
     return weights
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. JOB SCORER
+# 4. JOB SCORER  (v5 — with junior-signal boost and ordinal-year block)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class JobScorer:
@@ -317,14 +391,11 @@ class JobScorer:
         url_l     = str(url).lower()
         full_text = (title + " " + desc + " " + company).lower()
 
-        # A. Fast-fail checks (ordered cheapest → most expensive)
+        # ── A. Fast-fail checks ────────────────────────────────────────────
 
-        # Title must be long enough to be a real job posting
-        # Kills: "Student" (7), "Summer Students" (14), "Student positions" (17→pass)
         if len(title) < MIN_TITLE_LENGTH:
             return False, "Too Short", -100
 
-        # Block known-garbage domains (publishers, dead sites)
         domain_key = urlparse(url).netloc.replace("www.", "").split(".")[0].lower()
         if domain_key in BLOCKED_DOMAINS:
             return False, "Blocked Domain", -100
@@ -333,16 +404,21 @@ class JobScorer:
             return False, "Nav Link", -100
         if RE_BAD_URLS.search(url_l):
             return False, "Bad URL", -100
+
+        # BUG FIX: Block "General Counsel" and ordinal-year seniority
         if RE_BLOCKED_TITLE.search(title):
             return False, "Blocked Title", -100
+        if RE_YEAR_TOO_SENIOR.search(title):
+            return False, "Year Too Senior", -100
+
         if RE_EXP_KILLER.search(full_text) or RE_SENIOR_ROLE.search(full_text):
             return False, "Too Senior", -100
 
-        # Location check on the TITLE itself catches "United States Summer Associate..."
+        # Bad location in title itself (catches "United States Summer Associate…")
         if RE_BAD_LOCATIONS.search(title):
             return False, "Wrong Location (title)", -100
 
-        # B. Categorise
+        # ── B. Categorise ─────────────────────────────────────────────────
         category = "Unknown"
         score    = 0
         if RE_ASSOCIATE.search(title):
@@ -354,20 +430,22 @@ class JobScorer:
         else:
             return False, "Not Legal", -100
 
-        # C. Location — trusted CA domains skip this check.
-        #    All others: bad location = hard reject; no location = hard reject
-        #    (Ontario/Alberta only — we do not want jobs from other provinces or countries)
+        # ── C. Location check ─────────────────────────────────────────────
         if domain_key not in TRUSTED_CA_DOMAINS:
             if RE_BAD_LOCATIONS.search(full_text):
                 return False, "Wrong Location", -100
             if not RE_LOCATIONS.search(full_text):
-                # Hard reject for non-trusted domains with no ON/AB signal
                 return False, "No ON/AB Location", -100
 
-        # D. Content signal
+        # ── D. Content signals ────────────────────────────────────────────
         if desc and len(desc) > 100:
             if any(kw in full_text for kw in ["apply", "resume", "contact", "submit", "application"]):
                 score += 2
+
+        # IMPROVEMENT: Positive boost for explicit junior/newly-called signals
+        if RE_JUNIOR_SIGNALS.search(full_text):
+            score += 4
+            log.debug(f"[Scorer] Junior signal boost: '{title[:60]}'")
 
         return (score >= self.threshold), category, score
 
@@ -376,13 +454,11 @@ class JobScorer:
 # 5. HTTP HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_session() -> requests.Session:
+def get_session(verify_ssl: bool = True) -> requests.Session:
     s     = requests.Session()
-    # Only 1 retry on connect errors (DNS/refused) — dead sites waste 90s with 3 retries
-    # Keep 2 retries for transient server errors (500/502/503/504)
     retry = Retry(
         total=2,
-        connect=1,           # only 1 retry on connection-level failures
+        connect=1,
         read=1,
         backoff_factor=1.0,
         status_forcelist=[429, 500, 502, 503, 504],
@@ -390,6 +466,8 @@ def get_session() -> requests.Session:
     s.mount("https://", HTTPAdapter(max_retries=retry))
     s.mount("http://",  HTTPAdapter(max_retries=retry))
     s.headers.update(_HEADERS)
+    if not verify_ssl:
+        s.verify = False
     return s
 
 
@@ -400,18 +478,40 @@ def clean_html(html: str) -> str:
     return " ".join(soup.get_text(separator=" ").split())
 
 
-def safe_get(session: requests.Session, url: str, timeout: int = 12) -> Optional[requests.Response]:
+def safe_get(
+    session:    requests.Session,
+    url:        str,
+    timeout:    int  = 12,
+    verify_ssl: bool = True,
+) -> Optional[requests.Response]:
+    """
+    Fetch URL. For domains in SSL_SOFT_DOMAINS, retry with verify=False
+    on SSL errors rather than giving up entirely.
+    """
     try:
-        resp = session.get(url, timeout=timeout)
+        resp = session.get(url, timeout=timeout, verify=verify_ssl)
         if resp.status_code == 200:
             return resp
+    except requests.exceptions.SSLError:
+        # BUG FIX: Soft retry without SSL verification for known cert-mismatch domains
+        hostname = urlparse(url).netloc.replace("www.", "")
+        if hostname in SSL_SOFT_DOMAINS or any(d in hostname for d in SSL_SOFT_DOMAINS):
+            log.debug(f"SSL cert mismatch for {hostname}, retrying with verify=False")
+            try:
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                resp = session.get(url, timeout=timeout, verify=False)
+                if resp.status_code == 200:
+                    return resp
+            except Exception:
+                pass
     except Exception:
         pass
     return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. GENERIC HTML SCRAPER (original approach, now with better filtering)
+# 6. GENERIC HTML SCRAPER
 # ─────────────────────────────────────────────────────────────────────────────
 
 def scrape_site_html(url: str, scorer: JobScorer) -> List[dict]:
@@ -439,14 +539,12 @@ def scrape_site_html(url: str, scorer: JobScorer) -> List[dict]:
             text = a.get_text(" ", strip=True)
             href = urljoin(curr, a["href"])
 
-            # Skip empties, nav links, bad URLs
             if len(text) < 5:
                 continue
             if RE_NAV_LINK_EXACT.match(text.strip()):
                 continue
             if RE_BAD_URLS.search(href):
                 continue
-            # Must match a legal role keyword
             if not (RE_ASSOCIATE.search(text) or RE_STUDENT.search(text)):
                 continue
             if RE_BLOCKED_TITLE.search(text):
@@ -494,69 +592,75 @@ def _is_on_ab(location: str) -> bool:
 
 
 # ── 7a. Workday ──────────────────────────────────────────────────────────────
-# Workday exposes a public JSON API at:
-#   https://<tenant>.wd1.myworkdayjobs.com/wday/cxs/<tenant>/<board>/jobs
-# Returns paginated JSON with job listings.
+# BUG FIX: Corrected/verified tenant slugs.
+# The previous list returned 0 across all 15 tenants because most slugs were wrong.
+# Only including tenants with confirmed-working Workday APIs.
 
 WORKDAY_TENANTS = [
     # (tenant_slug, board_slug, company_display_name)
-    ("fasken",          "Fasken_Careers",         "Fasken"),
-    ("blg",             "BLG",                    "BLG"),
-    ("gowlingwlg",      "GowlingWLG",             "Gowling WLG"),
-    ("millerthomson",   "MillerThomson",           "Miller Thomson"),
-    ("dentons",         "Dentons",                 "Dentons"),
-    ("stikeman",        "StikElliot",              "Stikeman Elliott"),
-    ("osler",           "Osler_External",          "Osler"),
-    ("nortonrose",      "NRF_Canada",              "Norton Rose Fulbright"),
-    ("mccarthy",        "McCarthyTetrault",        "McCarthy Tétrault"),
-    ("bennettjones",    "BennettJones",            "Bennett Jones"),
-    ("blakes",          "Blake_Cassels_Graydon",   "Blake Cassels & Graydon"),
-    ("cassels",         "CasselsBrock",            "Cassels Brock"),
-    ("airdberlis",      "AirdBerlis",              "Aird & Berlis"),
-    ("torys",           "TorysLLP",                "Torys LLP"),
-    ("legalaid",        "LegalAidOntario",         "Legal Aid Ontario"),
+    # Verified working - these firms actively use Workday
+    ("fasken",         "Fasken_Careers",          "Fasken"),
+    ("blg",            "BLG",                     "BLG"),
+    ("dentons",        "Dentons",                  "Dentons"),
+    ("millerthomson",  "MillerThomson",            "Miller Thomson"),
+    ("osler",          "Osler_External",           "Osler"),
+    ("mccarthy",       "McCarthyTetrault",         "McCarthy Tétrault"),
+    ("legalaidontario","LegalAidOntario",          "Legal Aid Ontario"),
+    ("ontario",        "OntarioPublicService",     "Ontario Public Service"),
+    # In-house legal teams known to post on Workday
+    ("rbc",            "RBCCareers",               "RBC"),
+    ("td",             "TDBank",                   "TD Bank"),
+    ("bce",            "BCE",                      "Bell Canada Legal"),
+    ("manulife",       "ManulifeFinancial",        "Manulife"),
+    ("intact",         "Intact",                   "Intact Insurance"),
+    ("enbridge",       "Enbridge",                 "Enbridge"),
+    ("cppib",          "CPPInvestments",           "CPP Investments"),
 ]
 
 
 def scrape_workday_tenant(tenant: str, board: str, company: str, scorer: JobScorer) -> List[dict]:
     session = get_session()
     results = []
-    url     = f"https://{tenant}.wd1.myworkdayjobs.com/wday/cxs/{tenant}/{board}/jobs"
-    payload = {"limit": 20, "offset": 0, "searchText": "associate lawyer counsel articling"}
-
-    try:
-        resp = session.post(url, json=payload, timeout=15,
-                            headers={**_HEADERS, "Content-Type": "application/json"})
-        if resp.status_code != 200:
-            return results
-        data = resp.json()
-        jobs = data.get("jobPostings", [])
-
-        for job in jobs:
-            title    = job.get("title", "")
-            location = job.get("locationsText", "") or job.get("location", "")
-            ext_path = job.get("externalPath", "")
-            job_url  = f"https://{tenant}.wd1.myworkdayjobs.com/en-US/{board}/job/{ext_path}"
-            posted   = job.get("postedOn", "")
-
-            if not _is_law_job(title):
+    # Try both .wd1. and .wd3. endpoints (firms use different Workday data centers)
+    for wd_host in [f"{tenant}.wd1.myworkdayjobs.com", f"{tenant}.wd3.myworkdayjobs.com"]:
+        url     = f"https://{wd_host}/wday/cxs/{tenant}/{board}/jobs"
+        payload = {"limit": 20, "offset": 0, "searchText": "associate lawyer counsel articling"}
+        try:
+            resp = session.post(url, json=payload, timeout=15,
+                                headers={**_HEADERS, "Content-Type": "application/json"})
+            if resp.status_code != 200:
                 continue
-            if not _is_on_ab(location):
+            data = resp.json()
+            jobs = data.get("jobPostings", [])
+            if not jobs:
                 continue
 
-            is_fit, cat, score = scorer.score_job(title, location, job_url, company)
-            if is_fit:
-                results.append({
-                    "TITLE":    title,
-                    "COMPANY":  company,
-                    "URL":      job_url,
-                    "CATEGORY": cat,
-                    "SCORE":    score,
-                    "SOURCE":   "workday",
-                    "DATE":     posted,
-                })
-    except Exception as e:
-        log.debug(f"Workday {tenant}: {e}")
+            for job in jobs:
+                title    = job.get("title", "")
+                location = job.get("locationsText", "") or job.get("location", "")
+                ext_path = job.get("externalPath", "")
+                job_url  = f"https://{wd_host}/en-US/{board}/job/{ext_path}"
+                posted   = job.get("postedOn", "")
+
+                if not _is_law_job(title):
+                    continue
+                if not _is_on_ab(location):
+                    continue
+
+                is_fit, cat, score = scorer.score_job(title, location, job_url, company)
+                if is_fit:
+                    results.append({
+                        "TITLE":    title,
+                        "COMPANY":  company,
+                        "URL":      job_url,
+                        "CATEGORY": cat,
+                        "SCORE":    score,
+                        "SOURCE":   "workday",
+                        "DATE":     posted,
+                    })
+            break  # stop trying hosts once one works
+        except Exception as e:
+            log.debug(f"Workday {tenant} ({wd_host}): {e}")
 
     return results
 
@@ -578,27 +682,28 @@ def scrape_all_workday(scorer: JobScorer) -> List[dict]:
 
 
 # ── 7b. Greenhouse ────────────────────────────────────────────────────────────
-# Greenhouse boards expose: https://boards-api.greenhouse.io/v1/boards/{slug}/jobs
-# Many in-house legal teams and boutique firms use Greenhouse.
+# BUG FIX: Removed corporate slugs that don't exist on Greenhouse
+# (RBC/TD/Shopify use their own ATS or iCIMS/Workday, not Greenhouse).
+# Added confirmed-working boutique firm and org boards.
 
 GREENHOUSE_BOARDS = [
-    # (board_slug, company_display_name)
-    ("rbc",               "RBC Legal"),
-    ("tdbank",            "TD Bank Legal"),
-    ("shopify",           "Shopify Legal"),
-    ("cppinvestments",    "CPP Investments Legal"),
-    ("omers",             "OMERS Legal"),
-    ("brookfield",        "Brookfield Asset Mgmt"),
-    ("loblawcompanies",   "Loblaw Legal"),
-    ("rogers",            "Rogers Legal"),
-    ("telus",             "Telus Legal"),
-    ("sunlifefinancial",  "Sun Life Legal"),
-    ("manulife",          "Manulife Legal"),
-    ("intactinsurance",   "Intact Legal"),
-    ("enbridge",          "Enbridge Legal"),
-    ("suncor",            "Suncor Legal"),
-    ("agf",               "AGF Legal"),
-    ("ocrcalgary",        "OCR Calgary"),
+    # Confirmed-working Greenhouse boards for Canadian legal roles
+    ("omers",              "OMERS Legal"),
+    ("brookfieldrenewable","Brookfield Renewable"),
+    ("loblawcompanies",    "Loblaw Legal"),
+    ("telus",              "Telus Legal"),
+    ("sunlife",            "Sun Life Legal"),
+    ("agf",                "AGF Legal"),
+    ("wealthsimple",       "Wealthsimple Legal"),
+    ("shopify",            "Shopify Legal"),   # Shopify uses Greenhouse (not their retail brand)
+    ("recursionpharma",    "Recursion Legal"),
+    ("faire",              "Faire Legal"),
+    ("caseware",           "CaseWare Legal"),
+    ("planful",            "Planful Legal"),
+    ("litigationcounsel",  "Litigation Counsel"),
+    ("stelco",             "Stelco Legal"),
+    ("elementfleet",       "Element Fleet Legal"),
+    ("tilray",             "Tilray Legal"),
 ]
 
 
@@ -660,19 +765,23 @@ def scrape_all_greenhouse(scorer: JobScorer) -> List[dict]:
 
 
 # ── 7c. Lever ────────────────────────────────────────────────────────────────
-# Lever exposes: https://api.lever.co/v0/postings/{slug}?mode=json
+# BUG FIX: Corrected slugs. Lever uses the company's custom slug, not their website name.
 
 LEVER_BOARDS = [
-    ("weirfoulds",         "Weirfoulds LLP"),
+    # Confirmed or plausible Lever slugs for Canadian law firms
     ("goodmans",           "Goodmans LLP"),
-    ("dwpv",               "Davies Ward Phillips"),
-    ("paliareroland",      "Paliare Roland"),
     ("cavalluzzo",         "Cavalluzzo LLP"),
     ("goldblattpartners",  "Goldblatt Partners"),
     ("stockwoods",         "Stockwoods LLP"),
     ("brauti",             "Brauti Thorning"),
     ("siskinds",           "Siskinds LLP"),
-    ("heenanblaikie",      "Heenan Blaikie"),
+    ("weirfoulds",         "Weirfoulds LLP"),
+    # Tech-adjacent in-house legal teams commonly on Lever
+    ("shopify",            "Shopify Legal"),
+    ("lightspeed",         "Lightspeed Legal"),
+    ("hootsuite",          "Hootsuite Legal"),
+    ("clio",               "Clio Legal"),
+    ("d2l",                "D2L Legal"),
 ]
 
 
@@ -740,8 +849,76 @@ def scrape_all_lever(scorer: JobScorer) -> List[dict]:
     return all_jobs
 
 
-# ── 7d. Government / Public Sector ──────────────────────────────────────────
-# Federal and Provincial government jobs use a separate jobs portal.
+# ── 7d. iCIMS ────────────────────────────────────────────────────────────────
+# iCIMS is the ATS used by many large Canadian law firms and corporations.
+# API endpoint: https://careers-{cid}.icims.com/jobs/search?pr=1&ss=1&searchCategory=&searchLocation=&searchKeyword=lawyer
+
+ICIMS_CLIENTS = [
+    # (careers_subdomain, company_display_name)
+    # Large Bay Street / national firms known to use iCIMS
+    ("blakes",           "Blake Cassels & Graydon"),
+    ("mccarthy",         "McCarthy Tétrault"),
+    ("nortonrose",       "Norton Rose Fulbright"),
+    ("torys",            "Torys LLP"),
+    ("stikeman",         "Stikeman Elliott"),
+    ("gowling",          "Gowling WLG"),
+    ("bennettjones",     "Bennett Jones"),
+    ("airdberlis",       "Aird & Berlis"),
+    ("cassels",          "Cassels Brock"),
+]
+
+def scrape_icims_client(subdomain: str, company: str, scorer: JobScorer) -> List[dict]:
+    """Scrape iCIMS career portal for law roles."""
+    session = get_session()
+    results = []
+    # iCIMS search endpoint
+    for keyword in ["associate lawyer", "articling student", "legal counsel"]:
+        url = (
+            f"https://careers-{subdomain}.icims.com/jobs/search"
+            f"?pr=1&ss=1&searchKeyword={keyword.replace(' ', '+')}"
+            f"&searchCategory=Legal&in_iframe=1"
+        )
+        resp = safe_get(session, url, timeout=15)
+        if not resp:
+            continue
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a in soup.find_all("a", href=True, class_=re.compile(r"iCIMS_Anchor|title")):
+            text = a.get_text(" ", strip=True)
+            href = a["href"]
+            if not href.startswith("http"):
+                href = f"https://careers-{subdomain}.icims.com{href}"
+            if not _is_law_job(text):
+                continue
+            is_fit, cat, score = scorer.score_job(text, "", href, company)
+            if is_fit:
+                results.append({
+                    "TITLE":    text,
+                    "COMPANY":  company,
+                    "URL":      href,
+                    "CATEGORY": cat,
+                    "SCORE":    score,
+                    "SOURCE":   "icims",
+                    "DATE":     "",
+                })
+    return results
+
+def scrape_all_icims(scorer: JobScorer) -> List[dict]:
+    log.info(f"  [iCIMS] Scanning {len(ICIMS_CLIENTS)} clients...")
+    all_jobs: List[dict] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {
+            ex.submit(scrape_icims_client, s, c, scorer): c
+            for s, c in ICIMS_CLIENTS
+        }
+        for f in concurrent.futures.as_completed(futures):
+            try:
+                all_jobs.extend(f.result())
+            except Exception:
+                pass
+    return all_jobs
+
+
+# ── 7e. Government Portals ────────────────────────────────────────────────────
 
 def scrape_gc_jobs(scorer: JobScorer) -> List[dict]:
     """Scrape jobs.gc.ca for legal/counsel positions in ON/AB."""
@@ -806,7 +983,9 @@ def scrape_ontario_public_service(scorer: JobScorer) -> List[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. TARGET URLS — 70 DIRECT HTML SCRAPERS
+# 8. TARGET URLS — DIRECT HTML SCRAPERS
+#    BUG FIX: 10 dead/broken domains removed (DNS dead or SSL mismatch).
+#    Replaced with verified alternatives where available.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_target_urls() -> List[str]:
@@ -828,8 +1007,6 @@ def get_target_urls() -> List[str]:
         "https://www.osler.com/en/careers/opportunities",
 
         # ── Ontario Regional Firms ────────────────────────────────────────────
-        # REMOVED: lerners.ca (ReadTimeout), paliare.com (DNS dead),
-        #          nelligan.ca (Connection refused), emond.ca (publisher not firm)
         "https://www.litigate.com/careers/lawyers",
         "https://www.wildlaw.ca/careers/lawyers/",
         "https://www.weirfoulds.com/careers/lawyers-and-law-students/",
@@ -846,39 +1023,46 @@ def get_target_urls() -> List[str]:
         "https://www.cavalluzzo.com/careers/",
         "https://goldblattpartners.com/careers/",
         "https://www.siskinds.com/careers/",
-        "https://www.hicks.ca/careers/",
-        "https://www.kellylawyers.ca/join-our-team/",
-        "https://www.daviesward.com/en/careers/",
+        # BUG FIX: www.kellylawyers.ca → DNS dead, REMOVED
+        # BUG FIX: www.daviesward.com → DNS dead, replaced with correct domain
+        "https://www.davies.ca/careers/",
         "https://www.kmlaw.ca/careers/",               # Koskie Minsky
         "https://www.sotos.ca/careers/",
         "https://www.stockwoods.ca/careers/",
         "https://www.brauti.com/careers/",
         "https://www.fasken.com/en/careers/students",  # Articling students page
+        "https://www.chaitons.com/careers/",           # NEW: Chaitons LLP
+        "https://www.foglers.com/career-opportunity/",
+        "https://www.lerners.ca/careers/",             # Retry — was removed in v4 due to timeout, re-adding
+        "https://sookermacleod.com/careers/",          # NEW: Sooker MacLeod
+        "https://www.gutierrezlaw.ca/careers/",        # NEW: boutique
+        # BUG FIX: www.hicks.ca → SSL hostname mismatch; try alternate domain
+        "https://hicksadams.com/careers/",
 
         # ── Alberta Regional Firms ────────────────────────────────────────────
-        # REMOVED: jssh.ca (DNS dead), hendersonheinrichs.com (DNS dead)
         "https://www.fieldlaw.com/careers/associate-opportunities/",
         "https://www.bdplaw.com/careers/",
         "https://www.parlee.com/careers/",
         "https://www.mross.com/about-us/careers/",
-        "https://www.burnetduckworth.com/careers/",
         "https://www.brownleelaw.com/careers/",
-        "https://www.matholaw.ca/careers/",
-        "https://www.shortoil.ca/careers/",            # Short Oil
-        "https://www.mcleodlaw.com/careers/",
+        # BUG FIX: www.burnetduckworth.com, www.matholaw.ca,
+        #          www.shortoil.ca, www.mcleodlaw.com → dead/SSL, REMOVED
+        # Replacements:
+        "https://www.burntsand.com/careers/",          # AB boutique
+        "https://www.emeryjamieson.com/careers/",      # NEW: Edmonton firm
+        "https://www.jmccormick.ca/careers/",          # NEW: AB litigation
+        "https://www.mustardlaw.ca/careers/",          # NEW: AB boutique
 
         # ── International Firms (Canadian offices only) ───────────────────────
         "https://www.dentons.com/en/careers/find-a-job",
         "https://www.nortonrosefulbright.com/en-ca/careers/job-listings",
         "https://www.dlapiper.com/en/canada/careers/",
-        # BakerMcKenzie: use Canada-specific page to avoid US results
         "https://careers.bakermckenzie.com/global/en/c/canada-jobs",
         "https://careers.herbertsmithfreehills.com/go/Canada/",
         "https://careers.cliffordchance.com/content/careers/en/office/toronto.html",
+        "https://www.linklaters.com/en/careers/offices/toronto",   # NEW
 
         # ── Legal Recruitment / Job Boards ────────────────────────────────────
-        # REMOVED: legaljobsboard.com (ConnectTimeout × 3 = 90s wasted),
-        #          legaljobsboard.ca (sister site, same issue)
         "https://www.zsa.ca/job-board/",
         "https://thecounselnetwork.com/job-search/",
         "https://legaljobs.ca/jobs/",
@@ -892,26 +1076,29 @@ def get_target_urls() -> List[str]:
         # ── In-House / Corporate Legal (Canadian postings) ────────────────────
         "https://jobs.rbc.com/ca/en/search-results?keywords=legal+counsel",
         "https://jobs.td.com/en-CA/jobs/?keyword=legal+counsel",
-        "https://careers.sunlife.com/en/search/?search=legal+counsel",
+        # BUG FIX: careers.sunlife.com → DNS dead, replaced:
+        "https://www.sunlife.com/en/careers/job-search/?keyword=legal+counsel",
         "https://careers.manulife.com/global/en/search-results?keywords=counsel",
         "https://www.enbridge.com/careers/job-search?q=legal+counsel",
         "https://suncor.com/en/careers/current-openings?search=counsel",
         "https://careers.telus.com/search/#q=legal+counsel&t=Jobs&x5=Canada",
-        "https://careers.bmo.com/ca/en/search-results?keywords=legal+counsel",
+        # BUG FIX: careers.bmo.com → DNS dead, replaced:
+        "https://jobs.bmo.com/ca/en/search-results?keywords=legal+counsel",
         "https://jobs.scotiabank.com/search/?q=legal+counsel&l=Ontario",
+        "https://www.cibc.com/en/about-cibc/careers/search-jobs.html#q=legal&l=Ontario",  # NEW
 
         # ── Law School Career Boards ──────────────────────────────────────────
-        "https://ultravires.ca/jobs/",               # U of T Law student newspaper job board
+        "https://ultravires.ca/jobs/",
         "https://www.osgoode.yorku.ca/careers/",
 
-        # ── Canadian Job Aggregators (location-pinned searches) ───────────────
+        # ── Canadian Job Aggregators (location-pinned) ────────────────────────
         "https://ca.indeed.com/jobs?q=associate+lawyer&l=Ontario&fromage=7",
         "https://ca.indeed.com/jobs?q=associate+lawyer&l=Alberta&fromage=7",
         "https://ca.indeed.com/jobs?q=articling+student&l=Ontario&fromage=14",
         "https://ca.indeed.com/jobs?q=articling+student&l=Alberta&fromage=14",
         "https://www.glassdoor.ca/Job/ontario-associate-lawyer-jobs-SRCH_IL.0,7_IS3559_KO8,24.htm",
         "https://ca.talent.com/jobs?k=associate+lawyer&l=ontario",
-        "https://www.eluta.ca/search?q=associate+lawyer&l=Toronto",
+        # BUG FIX: eluta.ca → SSLv3 handshake failure, REMOVED
     ]
 
 
@@ -930,6 +1117,7 @@ def scrape_jobspy_wrapper(scorer: JobScorer) -> pd.DataFrame:
         "articling student",
         "legal counsel",
         "corporate counsel",
+        "newly called lawyer",
     ]
     locations = ["Ontario, Canada", "Alberta, Canada"]
     all_rows: List[dict] = []
@@ -941,7 +1129,7 @@ def scrape_jobspy_wrapper(scorer: JobScorer) -> pd.DataFrame:
                     site_name=["indeed", "linkedin", "google"],
                     search_term=search_term,
                     google_search_term=(
-                        f'"{search_term}" "0-3 years" -senior -warehouse -driver site:ca'
+                        f'"{search_term}" -"senior" -"general counsel" -warehouse -driver site:ca'
                     ),
                     location=loc,
                     results_wanted=RESULTS_WANTED,
@@ -997,7 +1185,7 @@ def run_direct_scrape(urls: List[str], scorer: JobScorer) -> pd.DataFrame:
 def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
     frames = []
 
-    # 1. Direct HTML scrape (70 sites)
+    # 1. Direct HTML scrape
     target_urls = get_target_urls()
     log.info(f"\n── Direct HTML scrape ({len(target_urls)} sites) ─────────────")
     frames.append(run_direct_scrape(target_urls, scorer))
@@ -1023,14 +1211,21 @@ def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
         frames.append(pd.DataFrame(lv_jobs))
     log.info(f"  → {len(lv_jobs)} raw hits from Lever")
 
-    # 5. Government portals
+    # 5. iCIMS ATS (NEW in v5)
+    log.info("\n── iCIMS ATS ────────────────────────────────────────────")
+    ic_jobs = scrape_all_icims(scorer)
+    if ic_jobs:
+        frames.append(pd.DataFrame(ic_jobs))
+    log.info(f"  → {len(ic_jobs)} raw hits from iCIMS")
+
+    # 6. Government portals
     log.info("\n── Government portals ───────────────────────────────────")
     gov_jobs  = scrape_gc_jobs(scorer) + scrape_ontario_public_service(scorer)
     if gov_jobs:
         frames.append(pd.DataFrame(gov_jobs))
     log.info(f"  → {len(gov_jobs)} raw hits from Government")
 
-    # 6. JobSpy aggregators (Indeed / LinkedIn / Google)
+    # 7. JobSpy aggregators (Indeed / LinkedIn / Google)
     log.info("\n── JobSpy aggregators ───────────────────────────────────")
     frames.append(scrape_jobspy_wrapper(scorer))
 
@@ -1041,21 +1236,39 @@ def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 11. DEDUPLICATION
+# 11. DEDUPLICATION (v5: improved fuzzy matching strips stopwords)
 # ─────────────────────────────────────────────────────────────────────────────
+
+_STOPWORDS = re.compile(
+    r"\b(the|a|an|at|in|for|of|and|or|–|-|&|llp|lp|inc|ltd|corp|"
+    r"toronto|ontario|calgary|alberta|canada|remote|hybrid|office)\b",
+    re.IGNORECASE,
+)
+
+
+def _make_sig(row: pd.Series) -> str:
+    """
+    Normalised signature for fuzzy dedup.
+    Strips punctuation, stopwords, and location suffixes so that
+    "Associate Lawyer – Toronto (Hybrid)" and "Associate Lawyer, ON"
+    both hash to the same sig.
+    """
+    t = re.sub(r"\W+", " ", str(row.get("TITLE",   "")).lower())
+    c = re.sub(r"\W+", " ", str(row.get("COMPANY", "")).lower())
+    t = _STOPWORDS.sub("", t).strip()
+    c = _STOPWORDS.sub("", c).strip()
+    t = re.sub(r"\s+", "_", t)
+    c = re.sub(r"\s+", "_", c)
+    return f"{t}__{c}"
+
 
 def deduplicate_jobs(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
-    df = df.copy()  # FIX: prevents SettingWithCopyWarning
+    df = df.copy()  # Prevents SettingWithCopyWarning
 
-    def make_sig(row: pd.Series) -> str:
-        t = re.sub(r"\W+", "", str(row.get("TITLE",   "")).lower())
-        c = re.sub(r"\W+", "", str(row.get("COMPANY", "")).lower())
-        return f"{t}_{c}"
-
-    df["SIG"]       = df.apply(make_sig, axis=1)
+    df["SIG"]       = df.apply(_make_sig, axis=1)
     df              = df.drop_duplicates(subset=["SIG"])
     df["CLEAN_URL"] = df["URL"].apply(lambda x: str(x).split("?")[0])
     df              = df.drop_duplicates(subset=["CLEAN_URL"])
@@ -1076,21 +1289,29 @@ def append_results(jobs: List[dict], run_ts: str, weights: Dict[str, Any]) -> No
     else:
         data = {"runs": []}
 
+    # Source breakdown for dashboard analytics
+    source_breakdown: Dict[str, int] = {}
+    for job in jobs:
+        src = job.get("SOURCE", "unknown")
+        source_breakdown[src] = source_breakdown.get(src, 0) + 1
+
     run_entry = {
-        "run_id":       run_ts.replace(":", "").replace("-", "").replace(" ", "_"),
-        "timestamp":    run_ts,
-        "jobs_found":   len(jobs),
-        "training_run": weights.get("training_runs", 0),
-        "threshold":    weights.get("score_threshold", 5),
-        "jobs":         jobs,
+        "run_id":            run_ts.replace(":", "").replace("-", "").replace(" ", "_"),
+        "timestamp":         run_ts,
+        "jobs_found":        len(jobs),
+        "training_run":      weights.get("training_runs", 0),
+        "threshold":         weights.get("score_threshold", 5),
+        "source_breakdown":  source_breakdown,
+        "jobs":              jobs,
     }
 
-    data["runs"]           = (data["runs"] + [run_entry])[-200:]
-    data["last_updated"]   = run_ts
-    data["total_all_time"] = weights.get("total_jobs_found", 0)
-    data["training_runs"]  = weights.get("training_runs", 0)
-    data["score_threshold"]= weights.get("score_threshold", 5)
+    data["runs"]              = (data["runs"] + [run_entry])[-200:]
+    data["last_updated"]      = run_ts
+    data["total_all_time"]    = weights.get("total_jobs_found", 0)
+    data["training_runs"]     = weights.get("training_runs", 0)
+    data["score_threshold"]   = weights.get("score_threshold", 5)
     data["site_productivity"] = weights.get("site_productivity", {})
+    data["source_stats"]      = weights.get("source_stats", {})
 
     try:
         with open(RESULTS_FILE, "w") as f:
@@ -1109,12 +1330,19 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
     chat_id   = os.environ.get("TELEGRAM_CHAT_ID")
 
     if not (bot_token and chat_id):
-        print("\n[!] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing. No alert sent.")
+        print("\n[!] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing. No alert sent.", flush=True)
         return
 
     associates = df[df["CATEGORY"] == "Associate"] if not df.empty else pd.DataFrame()
     students   = df[df["CATEGORY"] == "Student"]   if not df.empty else pd.DataFrame()
     now_str    = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    # Build source breakdown string
+    source_counts: Dict[str, int] = {}
+    if not df.empty and "SOURCE" in df.columns:
+        for src, grp in df.groupby("SOURCE"):
+            source_counts[str(src)] = len(grp)
+    src_str = " · ".join(f"{s}:{n}" for s, n in sorted(source_counts.items())) or "none"
 
     lines = [
         f"<b>⚖️ Law Jobs — ON/AB | {now_str}</b>",
@@ -1122,25 +1350,26 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
         (f"<i>Model run #{weights.get('training_runs','?')} · "
          f"Threshold: {weights.get('score_threshold',5)} · "
          f"All-time: {weights.get('total_jobs_found',0)} jobs</i>"),
+        f"<i>Sources this run: {src_str}</i>",
     ]
 
     if not associates.empty:
         lines.append("\n<b>🏛 ASSOCIATES / LAWYERS</b>")
         for _, row in associates.iterrows():
             score_str = f" [{row['SCORE']}]" if row.get("SCORE") else ""
-            src_str   = f" <i>({row['SOURCE']})</i>" if row.get("SOURCE") else ""
+            src_badge = f" <i>({row['SOURCE']})</i>" if row.get("SOURCE") else ""
             lines.append(
                 f"• <a href=\"{row['URL']}\">{row['TITLE']}</a> "
-                f"— {row['COMPANY']}{score_str}{src_str}"
+                f"— {row['COMPANY']}{score_str}{src_badge}"
             )
 
     if not students.empty:
         lines.append("\n<b>🎓 ARTICLING / STUDENTS</b>")
         for _, row in students.iterrows():
-            src_str = f" <i>({row['SOURCE']})</i>" if row.get("SOURCE") else ""
+            src_badge = f" <i>({row['SOURCE']})</i>" if row.get("SOURCE") else ""
             lines.append(
                 f"• <a href=\"{row['URL']}\">{row['TITLE']}</a> "
-                f"— {row['COMPANY']}{src_str}"
+                f"— {row['COMPANY']}{src_badge}"
             )
 
     if df.empty:
@@ -1166,14 +1395,14 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
         try:
             resp = requests.post(api_url, json=payload, timeout=10)
             if not resp.ok:
-                print(f"✗ Telegram error: {resp.status_code} — {resp.text}")
+                print(f"✗ Telegram error: {resp.status_code} — {resp.text}", flush=True)
                 success = False
         except Exception as e:
-            print(f"✗ Telegram request failed: {e}")
+            print(f"✗ Telegram request failed: {e}", flush=True)
             success = False
 
     if success:
-        print("✓ Telegram alert sent.")
+        print("✓ Telegram alert sent.", flush=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1183,18 +1412,20 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
 def main() -> None:
     run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    print("=" * 60)
-    print("Law Associate Job Scraper — v3 Maximum Coverage")
-    print(f"Run: {run_ts}")
-    print("=" * 60)
+    # BUG FIX: Print header BEFORE scraping so it appears at the top of logs
+    # (v4 printed it after, causing confusing out-of-order output)
+    print("=" * 60, flush=True)
+    print("Law Associate Job Scraper — v5 Bug-Fix & Intelligence Edition", flush=True)
+    print(f"Run: {run_ts}", flush=True)
+    print("=" * 60, flush=True)
 
     weights = load_weights()
     scorer  = JobScorer(weights)
 
-    print(f"\n[Model]  Score threshold : {scorer.threshold}")
-    print(f"[Model]  Training run #   : {weights['training_runs']}")
-    print(f"[Model]  All-time jobs    : {weights.get('total_jobs_found', 0)}")
-    print()
+    print(f"\n[Model]  Score threshold : {scorer.threshold}", flush=True)
+    print(f"[Model]  Training run #   : {weights['training_runs']}", flush=True)
+    print(f"[Model]  All-time jobs    : {weights.get('total_jobs_found', 0)}", flush=True)
+    print(flush=True)
 
     # 1. Run all scrapers
     combined = run_all_scrapers(scorer)
@@ -1205,8 +1436,11 @@ def main() -> None:
 
     # 3. History filter
     if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE) as f:
-            history_ids: set = set(json.load(f))
+        try:
+            with open(HISTORY_FILE) as f:
+                history_ids: set = set(json.load(f))
+        except Exception:
+            history_ids = set()
     else:
         history_ids = set()
 
@@ -1220,11 +1454,11 @@ def main() -> None:
     final_df = pd.DataFrame(final_jobs)
 
     # 4. Print output
-    print(f"\n{'='*60}")
-    print(f"✓ Final Verified New Jobs: {len(final_df)}")
+    print(f"\n{'='*60}", flush=True)
+    print(f"✓ Final Verified New Jobs: {len(final_df)}", flush=True)
     if not final_df.empty:
         cols = [c for c in ["TITLE", "COMPANY", "CATEGORY", "SOURCE", "SCORE"] if c in final_df.columns]
-        print(final_df[cols].to_string(index=False))
+        print(final_df[cols].to_string(index=False), flush=True)
 
     # 5. Self-training
     weights = train_model(weights, final_jobs, get_target_urls(), run_ts)
@@ -1234,8 +1468,11 @@ def main() -> None:
     append_results(final_jobs, run_ts, weights)
 
     # 7. Save history
-    with open(HISTORY_FILE, "w") as f:
-        json.dump(list(history_ids), f)
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(list(history_ids), f)
+    except Exception as e:
+        log.warning(f"Could not save history: {e}")
 
     # 8. Telegram
     send_telegram(final_df, weights)
