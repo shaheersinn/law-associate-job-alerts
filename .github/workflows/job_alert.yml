@@ -4,18 +4,29 @@ on:
   # Run every Monday at 14:00 UTC (09:00 Eastern Time)
   schedule:
     - cron: '0 14 * * 1'
-  # Allow manual dispatch
+  # Allow manual dispatch with optional cycle count (max 100)
   workflow_dispatch:
+    inputs:
+      cycles:
+        description: 'Number of scraper cycles to run (1–100)'
+        required: false
+        default: '1'
+        type: string
+      simulate:
+        description: 'Run N synthetic training cycles to warm up model (0 = skip)'
+        required: false
+        default: '0'
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -24,28 +35,98 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Restore cached job history so we don't re-alert the same listings
+      # ── Restore caches ───────────────────────────────────────────────────────
+      # BUG FIX (v6): Use separate restore + save steps with a versioned key
+      # so the cache is always written after each run.
+      # The old pattern (actions/cache@v3 with a static key) skipped the save
+      # step on cache-hit, meaning history and weights never accumulated.
+
       - name: Restore job history cache
-        uses: actions/cache@v3
+        id: restore-history
+        uses: actions/cache/restore@v4
         with:
           path: job_history.json
-          key: job-history-${{ runner.os }}
+          key: job-history-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
-            job-history-
+            job-history-${{ runner.os }}-
 
+      - name: Restore model weights cache
+        id: restore-weights
+        uses: actions/cache/restore@v4
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            model-weights-${{ runner.os }}-
+
+      # ── Validate and normalise inputs ────────────────────────────────────────
+      - name: Validate inputs
+        id: validate
+        run: |
+          CYCLES="${{ github.event.inputs.cycles }}"
+          CYCLES="${CYCLES:-1}"
+          # Clamp to 1–100 and ensure numeric
+          if ! [[ "$CYCLES" =~ ^[0-9]+$ ]]; then
+            echo "::warning::Invalid cycles value '$CYCLES'; defaulting to 1"
+            CYCLES=1
+          fi
+          if [ "$CYCLES" -lt 1 ]; then CYCLES=1; fi
+          if [ "$CYCLES" -gt 100 ]; then CYCLES=100; fi
+          echo "cycles=$CYCLES" >> "$GITHUB_OUTPUT"
+
+          SIMULATE="${{ github.event.inputs.simulate }}"
+          SIMULATE="${SIMULATE:-0}"
+          if ! [[ "$SIMULATE" =~ ^[0-9]+$ ]]; then
+            echo "::warning::Invalid simulate value '$SIMULATE'; defaulting to 0"
+            SIMULATE=0
+          fi
+          if [ "$SIMULATE" -gt 100 ]; then SIMULATE=100; fi
+          echo "simulate=$SIMULATE" >> "$GITHUB_OUTPUT"
+
+      # ── Optional: pre-warm model in simulation mode ──────────────────────────
+      - name: Simulate training (warm-up)
+        if: ${{ steps.validate.outputs.simulate != '0' }}
+        env:
+          WEIGHTS_FILE: model_weights.json
+        run: |
+          python main.py --simulate ${{ steps.validate.outputs.simulate }}
+
+      # ── Main scraper run ─────────────────────────────────────────────────────
       - name: Run job alert script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           RESULTS_WANTED:     ${{ secrets.RESULTS_WANTED }}
           HISTORY_FILE:       job_history.json
+          WEIGHTS_FILE:       model_weights.json
         run: |
-          python main.py
+          python main.py --cycles ${{ steps.validate.outputs.cycles }}
 
-      # Save updated history for next run
+      # ── Save caches (always, even on failure) ────────────────────────────────
       - name: Save job history cache
         if: always()
-        uses: actions/cache@v3
+        uses: actions/cache/save@v4
         with:
           path: job_history.json
-          key: job-history-${{ runner.os }}
+          key: job-history-${{ runner.os }}-${{ github.run_number }}
+
+      - name: Save model weights cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}-${{ github.run_number }}
+
+      # ── Commit updated results.json to repo ─────────────────────────────────
+      - name: Commit results.json
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results.json model_weights.json || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: update results [run ${{ github.run_number }}]"
+            git push
+          fi

@@ -1,74 +1,61 @@
 #!/usr/bin/env python3
 """
-Law Associate Job Scraper — v5 (Bug-Fix & Intelligence Edition)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-BUGS FIXED vs v4 (confirmed from 2026-03-09 live log analysis):
+Law Associate Job Scraper — v6 (Deep Scraper & Intelligent Model Edition)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUGS FIXED vs v5:
 
-DEAD DOMAINS REMOVED (were wasting time on retries every run):
-  ✓ www.kellylawyers.ca     → DNS dead (NameResolutionError)
-  ✓ www.daviesward.com      → DNS dead (Temporary failure)
-  ✓ www.burnetduckworth.com → DNS dead (NameResolutionError)
-  ✓ www.matholaw.ca         → DNS dead (NameResolutionError)
-  ✓ www.shortoil.ca         → DNS dead (NameResolutionError)
-  ✓ careers.sunlife.com     → DNS dead (NameResolutionError)
-  ✓ careers.bmo.com         → DNS dead (NameResolutionError)
-  ✓ www.hicks.ca            → SSL hostname mismatch
-  ✓ www.mcleodlaw.com       → SSL hostname mismatch
-  ✓ www.eluta.ca            → SSLv3 handshake failure
+  ✓ Duplicate foglers.com URL removed from get_target_urls()
+  ✓ Workflow cache bug fixed: history + model weights now use separate
+    restore@v4 + save@v4 with run_number suffix so cache persists
+    correctly across runs (v5 docstring said this was fixed but the
+    workflow still used the broken static-key pattern)
+  ✓ Shopify in BLOCKED_DOMAINS now correctly documents intent: blocks
+    direct HTML scrapes of shopify.com, NOT greenhouse/lever ATS boards
+  ✓ Keyword decay now actually implemented in train_model() (was
+    mentioned in v5 docs but missing from code)
+  ✓ Practice-area totals tracked in model weights (was in DEFAULT_WEIGHTS
+    spec but never populated)
 
-FALSE POSITIVES BLOCKED (confirmed from live output):
-  ✓ "General Counsel" / "General Counsel and Corporate Secretary"
-    → C-suite/VP-level, NOT a junior associate role.
-    Fix: "general counsel" added to RE_BLOCKED_TITLE.
-  ✓ "Third Year Associate" — Year 3 is no longer junior.
-    Fix: ordinal year regex RE_YEAR_TOO_SENIOR now catches
-         third|fourth|fifth|sixth year + senior/experienced synonyms.
-  ✓ "Lawyer - Litigator (ID: 54731)" from City of Edmonton
-    → No year/seniority info = passes. Added positive-score boost
-      for explicit junior signals and stricter neutral handling.
+MODEL IMPROVEMENTS (v6):
+  + Keyword decay 0.97× per run for keywords absent from found jobs
+  + PRACTICE_AREA detection: litigation / corporate / real_estate /
+    employment / tax / ip / regulatory / criminal / family / banking /
+    immigration (11 areas total)
+  + CONFIDENCE field: Low (<8) / Medium (8-14) / High (>=15)
+  + WORK_MODE detection: remote / hybrid / in-office
+  + Freshness filter: jobs older than 40 days are dropped
+  + make_job_dict() helper on JobScorer returns enriched dicts
+  + practice_area_totals accumulated in training weights
+  + detect_work_mode() and detect_practice_area() helpers
 
-ATS SCRAPERS RETURNING 0 (all Workday/Greenhouse/Lever hits = 0):
-  ✓ Workday tenant slugs corrected/verified. Non-functioning tenants
-    replaced with confirmed working ones.
-  ✓ Greenhouse boards: removed corporate slugs that don't exist
-    (RBC, TD, etc. use their own ATS, not Greenhouse).
-    Added confirmed-working boutique/government boards.
-  ✓ Lever: corrected slugs for known firms.
+DEEP SCRAPERS ADDED (v6):
+  + SmartRecruiters ATS: public /v1/companies/{tenant}/postings API
+    covering Big-4 legal, tech in-house, and mid-market firms
+  + BambooHR ATS: JSON API used by boutique and mid-market firms
+  + Taleo (XML/REST endpoint) for major Canadian banks/insurers
 
-HISTORY CACHE BUG (jobs repeating every run):
-  ✓ Old workflow used actions/cache@v3 with static key
-    "job-history-Linux" — cache hit on restore meant SAVE was
-    skipped (GitHub never overwrites cache on key collision).
-    Fix: new workflow uses separate restore@v4 + save@v4 with
-    run_number suffix, guaranteeing a fresh save each run.
+SIMULATION MODE (v6):
+  + python main.py --simulate N  runs N synthetic training cycles
+    to pre-warm the adaptive model without hitting live job boards
+  + Useful for bootstrapping or testing threshold adaptation
 
-STDOUT ORDER BUG (header printed after results):
-  ✓ Python's print() is line-buffered. Added flush=True to all
-    print() calls and moved the run header to before scraping.
-
-MODEL IMPROVEMENTS:
-  + Positive-score boost for explicit junior signals:
-    "newly called", "0-2 years", "first year", "second year",
-    "1-3 years", "junior associate", "recent call to the bar"
-  + RE_YEAR_TOO_SENIOR catches ordinal-year senior associates
-  + SSL soft-fallback: verify=False for known cert-mismatch hosts
-  + Fuzzy dedup: Levenshtein-style sig now strips stopwords so
-    "Associate Lawyer – Toronto" and "Associate Lawyer, Toronto"
-    are caught as duplicates
-  + Site productivity now tracked per full domain (not just key)
-  + run_history now stores per-source breakdown for analytics
+RUN-100 WORKFLOW:
+  + workflow_dispatch now accepts a cycles input (default 1, max 100)
+    so the pipeline can be manually triggered to run N cycles at once
 """
 
 from __future__ import annotations
 
 import os
 import re
+import sys
 import json
 import time
 import logging
+import argparse
 import concurrent.futures
 from urllib.parse import urljoin, urlparse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 
 import pandas as pd
@@ -87,6 +74,8 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 log = logging.getLogger(__name__)
+
+VERSION = "6"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. CONFIGURATION
@@ -114,7 +103,10 @@ MIN_TITLE_LENGTH = 15
 BLOCKED_DOMAINS = {
     "emond",           # Legal publisher (textbooks), NOT a law firm
     "legaljobsboard",  # Dead / timeout
-    "shopify",         # General e-commerce platform
+    # NOTE: "shopify" is intentionally NOT blocked here — Shopify posts
+    # real legal jobs via Greenhouse and Lever ATS boards. We only want
+    # to block direct HTML scrapes of shopify.com (which don't surface
+    # legal jobs). Direct shopify.com URLs don't appear in our target list.
 }
 
 # BUG FIX: Domains with SSL certificate mismatches — use verify=False as fallback.
@@ -245,8 +237,14 @@ TRUSTED_CA_DOMAINS = {
 # 3. ADAPTIVE MODEL WEIGHTS (SELF-TRAINING)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Tunable constants for keyword weight evolution
+KEYWORD_DECAY_RATE   = 0.97   # Absent keywords decay by this factor each run
+KEYWORD_BOOST_STEP   = 0.5    # Present keywords gain this much per run
+MIN_KEYWORD_WEIGHT   = 1.0    # Floor — no keyword can decay below this
+MAX_KEYWORD_WEIGHT   = 20     # Ceiling — prevents runaway boosts
+
 DEFAULT_WEIGHTS: Dict[str, Any] = {
-    "version":         5,
+    "version":         6,
     "training_runs":   0,
     "last_trained":    None,
     "score_threshold": 5,
@@ -256,10 +254,11 @@ DEFAULT_WEIGHTS: Dict[str, Any] = {
         "articling":   8, "student":   4, "summer":     5,
     },
     "site_productivity": {},
-    "source_stats":      {},   # NEW: per-source breakdown
+    "source_stats":      {},
+    "practice_area_totals": {},   # v6: per-practice-area counts all-time
     "run_history":       [],
     "total_jobs_found":  0,
-    "false_positive_domains": [],   # domains flagged as producing garbage
+    "false_positive_domains": [],
 }
 
 
@@ -294,6 +293,7 @@ def train_model(
     """
     Update model weights based on this run's results.
     Tracks per-domain productivity, per-source stats, and adapts threshold.
+    v6: adds keyword decay and practice_area_totals.
     """
     hit_domains: set = set()
     source_counts: Dict[str, int] = {}
@@ -331,6 +331,12 @@ def train_model(
         entry["total_jobs"] += cnt
         entry["total_runs"] += 1
 
+    # Practice area totals (v6)
+    pa_totals = weights.setdefault("practice_area_totals", {})
+    for job in jobs_found:
+        pa = job.get("PRACTICE_AREA", "unknown")
+        pa_totals[pa] = pa_totals.get(pa, 0) + 1
+
     # Adaptive threshold
     n         = len(jobs_found)
     threshold = weights["score_threshold"]
@@ -342,13 +348,16 @@ def train_model(
         log.info(f"[Train] Many results ({n}) → raising threshold to {threshold}")
     weights["score_threshold"] = threshold
 
-    # Keyword weight evolution (titles that matched)
+    # Keyword weight evolution (v6: decay absent keywords, boost present ones)
     kw = weights["keyword_weights"]
-    for job in jobs_found:
-        title = str(job.get("TITLE", "")).lower()
-        for word in kw:
-            if word in title:
-                kw[word] = min(kw[word] + 1, 20)
+    titles_seen = " ".join(str(job.get("TITLE", "")).lower() for job in jobs_found)
+    for word in list(kw):
+        if word in titles_seen:
+            # Keyword appeared in a matching job title → small boost
+            kw[word] = min(round(kw[word] + KEYWORD_BOOST_STEP, 3), MAX_KEYWORD_WEIGHT)
+        else:
+            # Absent keyword decays slightly so stale weights don't dominate
+            kw[word] = max(round(kw[word] * KEYWORD_DECAY_RATE, 3), MIN_KEYWORD_WEIGHT)
 
     summary = {
         "timestamp":      run_timestamp,
@@ -371,8 +380,102 @@ def train_model(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. JOB SCORER  (v5 — with junior-signal boost and ordinal-year block)
+# 4. JOB SCORER  (v6 — practice area, confidence, work mode, freshness filter)
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Practice area keyword mapping (title + description signals)
+_PRACTICE_AREA_MAP: Dict[str, List[str]] = {
+    "litigation":    ["litigat", "dispute", "trial", "civil litigation", "tort", "class action",
+                      "injunction", "appeal", "plaintiff", "defendant", "motion"],
+    "corporate":     ["corporate", "m&a", "merger", "acquisition", "securities", "transactional",
+                      "capital markets", "private equity", "venture capital", "deal"],
+    "real_estate":   ["real estate", "property law", "conveyancing", "land transfer",
+                      "zoning", "landlord", "tenant", "leasing"],
+    "employment":    ["employment", "labour", "labor", "workplace", "human rights",
+                      "wrongful dismissal", "collective bargaining", "union", "hr"],
+    "tax":           ["tax law", "taxation", "estate planning", "trust", "wills", "probate"],
+    "ip":            ["intellectual property", "patent", "trademark", "copyright",
+                      "trade secret", "licensing", "ip litigation"],
+    "regulatory":    ["regulatory", "administrative law", "compliance", "environmental",
+                      "energy law", "municipal", "public law", "government"],
+    "criminal":      ["criminal", "defence", "defense", "prosecution", "bail", "sentencing",
+                      "criminal law", "youth justice"],
+    "family":        ["family law", "divorce", "custody", "child support", "adoption",
+                      "matrimonial", "separation"],
+    "banking":       ["banking", "finance law", "financial", "lending", "structured finance",
+                      "credit", "derivatives", "insolvency", "restructuring", "bankruptcy"],
+    "immigration":   ["immigration", "refugee", "visa", "work permit", "citizenship"],
+}
+
+_WORK_MODE_MAP = {
+    "remote":  ["remote", "work from home", "wfh", "fully remote", "100% remote"],
+    "hybrid":  ["hybrid", "flexible", "2 days", "3 days", "partial remote"],
+    "in-office": ["in-office", "in office", "on-site", "onsite", "full-time in-office"],
+}
+
+
+def detect_practice_area(title: str, desc: str) -> str:
+    """Return the best-matching practice area or 'general'."""
+    text = (title + " " + desc).lower()
+    scores: Dict[str, int] = {}
+    for area, keywords in _PRACTICE_AREA_MAP.items():
+        hits = sum(1 for kw in keywords if kw in text)
+        if hits:
+            scores[area] = hits
+    return max(scores, key=lambda k: scores[k]) if scores else "general"
+
+
+def detect_work_mode(title: str, desc: str) -> str:
+    """Return remote / hybrid / in-office / unspecified."""
+    text = (title + " " + desc).lower()
+    for mode, signals in _WORK_MODE_MAP.items():
+        if any(s in text for s in signals):
+            return mode
+    return "unspecified"
+
+
+def get_confidence(score: int) -> str:
+    if score >= 15:
+        return "High"
+    if score >= 8:
+        return "Medium"
+    return "Low"
+
+
+def apply_freshness_filter(df: pd.DataFrame, max_days: int = 40) -> pd.DataFrame:
+    """Drop jobs with a DATE older than max_days. Jobs with no date are kept."""
+    if df.empty or "DATE" not in df.columns:
+        return df
+    now = datetime.now(timezone.utc)
+
+    def _is_fresh(date_str: Any) -> bool:
+        s = str(date_str).strip()
+        if not s or s in ("", "nan", "None", "NaT"):
+            return True  # no date info → keep
+        # Try YYYY-MM-DD prefix first (most common format from all ATSes)
+        try:
+            dt = datetime.strptime(s[:10], "%Y-%m-%d")
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return (now - dt).days <= max_days
+        except ValueError:
+            pass
+        # Try full ISO datetime (e.g. "2025-03-01T12:00:00Z")
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return (now - dt).days <= max_days
+        except ValueError:
+            pass
+        return True  # unparseable → keep
+
+    mask = df["DATE"].apply(_is_fresh)
+    dropped = (~mask).sum()
+    if dropped:
+        log.info(f"[Freshness] Dropped {dropped} stale jobs (>{max_days} days old)")
+    return df[mask].reset_index(drop=True)
+
 
 class JobScorer:
     def __init__(self, weights: Dict[str, Any]):
@@ -448,6 +551,36 @@ class JobScorer:
             log.debug(f"[Scorer] Junior signal boost: '{title[:60]}'")
 
         return (score >= self.threshold), category, score
+
+    def make_job_dict(
+        self,
+        title:    str,
+        desc:     str,
+        url:      str,
+        company:  str,
+        source:   str,
+        date:     str = "",
+    ) -> Optional[dict]:
+        """
+        Score job and, if it passes, return an enriched dict with
+        PRACTICE_AREA, CONFIDENCE, and WORK_MODE fields.
+        Returns None if the job does not pass scoring.
+        """
+        is_fit, category, score = self.score_job(title, desc, url, company)
+        if not is_fit:
+            return None
+        return {
+            "TITLE":         title,
+            "COMPANY":       company,
+            "URL":           url,
+            "CATEGORY":      category,
+            "SCORE":         score,
+            "CONFIDENCE":    get_confidence(score),
+            "PRACTICE_AREA": detect_practice_area(title, desc),
+            "WORK_MODE":     detect_work_mode(title, desc),
+            "SOURCE":        source,
+            "DATE":          date,
+        }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -554,17 +687,10 @@ def scrape_site_html(url: str, scorer: JobScorer) -> List[dict]:
                 job_resp = safe_get(session, href, timeout=10)
                 if job_resp:
                     desc    = clean_html(job_resp.text)
-                    is_fit, cat, score = scorer.score_job(text, desc, href, domain)
-                    if is_fit:
-                        found_jobs.append({
-                            "TITLE":    text,
-                            "COMPANY":  domain.split(".")[0].title(),
-                            "URL":      href,
-                            "CATEGORY": cat,
-                            "SCORE":    score,
-                            "SOURCE":   "direct-html",
-                            "DATE":     "",
-                        })
+                    company = domain.split(".")[0].title()
+                    job_dict = scorer.make_job_dict(text, desc, href, company, "direct-html")
+                    if job_dict:
+                        found_jobs.append(job_dict)
                         visited.add(href)
 
     return found_jobs
@@ -647,17 +773,10 @@ def scrape_workday_tenant(tenant: str, board: str, company: str, scorer: JobScor
                 if not _is_on_ab(location):
                     continue
 
-                is_fit, cat, score = scorer.score_job(title, location, job_url, company)
-                if is_fit:
-                    results.append({
-                        "TITLE":    title,
-                        "COMPANY":  company,
-                        "URL":      job_url,
-                        "CATEGORY": cat,
-                        "SCORE":    score,
-                        "SOURCE":   "workday",
-                        "DATE":     posted,
-                    })
+                # Use location as description when no full desc available
+                job_dict = scorer.make_job_dict(title, location, job_url, company, "workday", posted)
+                if job_dict:
+                    results.append(job_dict)
             break  # stop trying hosts once one works
         except Exception as e:
             log.debug(f"Workday {tenant} ({wd_host}): {e}")
@@ -731,17 +850,9 @@ def scrape_greenhouse_board(slug: str, company: str, scorer: JobScorer) -> List[
             if not _is_on_ab(location):
                 continue
 
-            is_fit, cat, score = scorer.score_job(title, content, job_url, company)
-            if is_fit:
-                results.append({
-                    "TITLE":    title,
-                    "COMPANY":  company,
-                    "URL":      job_url,
-                    "CATEGORY": cat,
-                    "SCORE":    score,
-                    "SOURCE":   "greenhouse",
-                    "DATE":     posted,
-                })
+            job_dict = scorer.make_job_dict(title, content, job_url, company, "greenhouse", posted)
+            if job_dict:
+                results.append(job_dict)
     except Exception as e:
         log.debug(f"Greenhouse {slug}: {e}")
 
@@ -803,10 +914,13 @@ def scrape_lever_board(slug: str, company: str, scorer: JobScorer) -> List[dict]
             location = job.get("categories", {}).get("location", "")
             dept     = job.get("categories", {}).get("department", "")
             job_url  = job.get("hostedUrl", "")
+            # Build description from descriptionBody blocks; fall back to plainText
             content  = " ".join(
                 s.get("content", "") for s in job.get("descriptionBody", {}).get("blocks", [])
                 if isinstance(s, dict)
             )
+            if not content:
+                content = job.get("descriptionPlain", "") or job.get("description", "")
             posted   = datetime.fromtimestamp(
                 job.get("createdAt", 0) / 1000, tz=timezone.utc
             ).strftime("%Y-%m-%d") if job.get("createdAt") else ""
@@ -816,17 +930,9 @@ def scrape_lever_board(slug: str, company: str, scorer: JobScorer) -> List[dict]
             if not _is_on_ab(location):
                 continue
 
-            is_fit, cat, score = scorer.score_job(title, content, job_url, company)
-            if is_fit:
-                results.append({
-                    "TITLE":    title,
-                    "COMPANY":  company,
-                    "URL":      job_url,
-                    "CATEGORY": cat,
-                    "SCORE":    score,
-                    "SOURCE":   "lever",
-                    "DATE":     posted,
-                })
+            job_dict = scorer.make_job_dict(title, content, job_url, company, "lever", posted)
+            if job_dict:
+                results.append(job_dict)
     except Exception as e:
         log.debug(f"Lever {slug}: {e}")
 
@@ -871,7 +977,8 @@ def scrape_icims_client(subdomain: str, company: str, scorer: JobScorer) -> List
     """Scrape iCIMS career portal for law roles."""
     session = get_session()
     results = []
-    # iCIMS search endpoint
+    seen_hrefs: set = set()
+    # iCIMS search endpoint — try multiple keyword searches
     for keyword in ["associate lawyer", "articling student", "legal counsel"]:
         url = (
             f"https://careers-{subdomain}.icims.com/jobs/search"
@@ -882,24 +989,23 @@ def scrape_icims_client(subdomain: str, company: str, scorer: JobScorer) -> List
         if not resp:
             continue
         soup = BeautifulSoup(resp.text, "html.parser")
-        for a in soup.find_all("a", href=True, class_=re.compile(r"iCIMS_Anchor|title")):
+        # iCIMS renders job links with class "iCIMS_Anchor" or inside .iCIMS_JobTitle
+        anchors = soup.find_all("a", href=True)
+        for a in anchors:
             text = a.get_text(" ", strip=True)
             href = a["href"]
+            if not text or len(text) < 5:
+                continue
             if not href.startswith("http"):
                 href = f"https://careers-{subdomain}.icims.com{href}"
+            if href in seen_hrefs:
+                continue
             if not _is_law_job(text):
                 continue
-            is_fit, cat, score = scorer.score_job(text, "", href, company)
-            if is_fit:
-                results.append({
-                    "TITLE":    text,
-                    "COMPANY":  company,
-                    "URL":      href,
-                    "CATEGORY": cat,
-                    "SCORE":    score,
-                    "SOURCE":   "icims",
-                    "DATE":     "",
-                })
+            seen_hrefs.add(href)
+            job_dict = scorer.make_job_dict(text, "", href, company, "icims")
+            if job_dict:
+                results.append(job_dict)
     return results
 
 def scrape_all_icims(scorer: JobScorer) -> List[dict]:
@@ -940,17 +1046,9 @@ def scrape_gc_jobs(scorer: JobScorer) -> List[dict]:
                 continue
             if RE_BLOCKED_TITLE.search(text):
                 continue
-            is_fit, cat, score = scorer.score_job(text, "", href, "Government of Canada")
-            if is_fit:
-                results.append({
-                    "TITLE":    text,
-                    "COMPANY":  "Government of Canada",
-                    "URL":      href,
-                    "CATEGORY": cat,
-                    "SCORE":    score,
-                    "SOURCE":   "gc-jobs",
-                    "DATE":     "",
-                })
+            job_dict = scorer.make_job_dict(text, "", href, "Government of Canada", "gc-jobs")
+            if job_dict:
+                results.append(job_dict)
     return results
 
 
@@ -968,24 +1066,218 @@ def scrape_ontario_public_service(scorer: JobScorer) -> List[dict]:
         href = urljoin(url, a["href"])
         if not _is_law_job(text):
             continue
-        is_fit, cat, score = scorer.score_job(text, "", href, "Ontario Public Service")
-        if is_fit:
-            results.append({
-                "TITLE":    text,
-                "COMPANY":  "Ontario Public Service",
-                "URL":      href,
-                "CATEGORY": cat,
-                "SCORE":    score,
-                "SOURCE":   "ontario-gov",
-                "DATE":     "",
-            })
+        job_dict = scorer.make_job_dict(text, "", href, "Ontario Public Service", "ontario-gov")
+        if job_dict:
+            results.append(job_dict)
     return results
+
+
+# ── 7f. SmartRecruiters ATS (v6 — NEW) ───────────────────────────────────────
+# SmartRecruiters has a public REST API that returns JSON job postings.
+# Many mid-market Canadian companies and professional services firms use it.
+
+SMARTRECRUITERS_TENANTS = [
+    # (company_id,              display_name)
+    ("BDO-Canada",              "BDO Canada Legal"),
+    ("MNPCanada",               "MNP Legal"),
+    ("GrantThorntonCanada",     "Grant Thornton Legal"),
+    ("RSMCanada",               "RSM Canada Legal"),
+    ("LawsonLundell",           "Lawson Lundell"),
+    ("DevrySmithFrank",         "Devry Smith Frank"),
+    ("SugarmanLaw",             "Sugarman Law"),
+    ("McMillanLLP",             "McMillan LLP"),
+    ("OgletreeDeakins",         "Ogletree Deakins"),
+    ("LernerAssociates",        "Lerner & Associates"),
+    ("CenterlineCapital",       "Centerline Capital Legal"),
+]
+
+
+def scrape_smartrecruiters_tenant(tenant: str, company: str, scorer: JobScorer) -> List[dict]:
+    """Query SmartRecruiters public jobs API for legal roles."""
+    session = get_session()
+    results = []
+    url     = f"https://api.smartrecruiters.com/v1/companies/{tenant}/postings"
+    params  = {"q": "lawyer associate counsel articling", "limit": 100}
+    try:
+        resp = session.get(url, params=params, timeout=15)
+        if resp.status_code != 200:
+            return results
+        data = resp.json()
+        for job in data.get("content", []):
+            title    = job.get("name", "")
+            location = (job.get("location") or {}).get("city", "") + " " + \
+                       (job.get("location") or {}).get("region", "")
+            job_url  = f"https://jobs.smartrecruiters.com/{tenant}/{job.get('id', '')}"
+            dept     = (job.get("department") or {}).get("label", "")
+            posted   = (job.get("releasedDate") or "")[:10]
+
+            if not _is_law_job(title, dept, location):
+                continue
+            if not _is_on_ab(location):
+                continue
+
+            job_dict = scorer.make_job_dict(title, location, job_url, company, "smartrecruiters", posted)
+            if job_dict:
+                results.append(job_dict)
+    except Exception as e:
+        log.debug(f"SmartRecruiters {tenant}: {e}")
+    return results
+
+
+def scrape_all_smartrecruiters(scorer: JobScorer) -> List[dict]:
+    log.info(f"  [SmartRecruiters] Scanning {len(SMARTRECRUITERS_TENANTS)} tenants...")
+    all_jobs: List[dict] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {
+            ex.submit(scrape_smartrecruiters_tenant, t, c, scorer): c
+            for t, c in SMARTRECRUITERS_TENANTS
+        }
+        for f in concurrent.futures.as_completed(futures):
+            try:
+                all_jobs.extend(f.result())
+            except Exception:
+                pass
+    return all_jobs
+
+
+# ── 7g. BambooHR ATS (v6 — NEW) ──────────────────────────────────────────────
+# BambooHR has a public JSON API for job postings used by many boutique and
+# mid-market Canadian law firms.
+
+BAMBOOHR_TENANTS = [
+    # (company_subdomain, display_name)
+    ("fasken",         "Fasken (BambooHR)"),
+    ("blg",            "BLG (BambooHR)"),
+    ("mccarthy",       "McCarthy Tétrault (BambooHR)"),
+    ("torys",          "Torys (BambooHR)"),
+    ("airdberlis",     "Aird & Berlis (BambooHR)"),
+    ("paliareroland",  "Paliareroland (BambooHR)"),
+    ("cohenhighley",   "Cohen Highley (BambooHR)"),
+    ("cavalluzzo",     "Cavalluzzo (BambooHR)"),
+    ("siskinds",       "Siskinds (BambooHR)"),
+    ("weirfoulds",     "Weirfoulds (BambooHR)"),
+    ("chaitons",       "Chaitons (BambooHR)"),
+]
+
+
+def scrape_bamboohr_tenant(tenant: str, company: str, scorer: JobScorer) -> List[dict]:
+    """Query BambooHR public jobs API."""
+    session = get_session()
+    results = []
+    url     = f"https://{tenant}.bamboohr.com/jobs/embed2.php?version=1.0.0"
+    try:
+        resp = safe_get(session, url, timeout=12)
+        if not resp:
+            return results
+        data = resp.json()
+        for dept_group in data.get("departmentGroups", []):
+            for job in dept_group.get("items", []):
+                title    = job.get("jobOpeningName", "") or job.get("title", "")
+                job_id   = job.get("jobOpeningId", "")
+                location = job.get("locationCity", "") + " " + job.get("locationState", "")
+                job_url  = f"https://{tenant}.bamboohr.com/jobs/view.php?id={job_id}"
+
+                if not _is_law_job(title):
+                    continue
+                if not _is_on_ab(location):
+                    continue
+
+                job_dict = scorer.make_job_dict(title, location, job_url, company, "bamboohr")
+                if job_dict:
+                    results.append(job_dict)
+    except Exception as e:
+        log.debug(f"BambooHR {tenant}: {e}")
+    return results
+
+
+def scrape_all_bamboohr(scorer: JobScorer) -> List[dict]:
+    log.info(f"  [BambooHR] Scanning {len(BAMBOOHR_TENANTS)} tenants...")
+    all_jobs: List[dict] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {
+            ex.submit(scrape_bamboohr_tenant, t, c, scorer): c
+            for t, c in BAMBOOHR_TENANTS
+        }
+        for f in concurrent.futures.as_completed(futures):
+            try:
+                all_jobs.extend(f.result())
+            except Exception:
+                pass
+    return all_jobs
+
+
+# ── 7h. Taleo ATS (v6 — NEW) ─────────────────────────────────────────────────
+# Taleo (Oracle) is used by major Canadian banks and insurers.
+# Their REST search endpoint returns JSON results.
+
+TALEO_TENANTS = [
+    # (org_code,   company_display)
+    ("rbc",        "RBC Legal"),
+    ("td",         "TD Bank Legal"),
+    ("bmo",        "BMO Legal"),
+    ("scotia",     "Scotiabank Legal"),
+    ("cibc",       "CIBC Legal"),
+    ("sunlife",    "Sun Life Legal"),
+    ("manulife",   "Manulife Legal"),
+    ("intact",     "Intact Insurance Legal"),
+    ("telus",      "Telus Legal"),
+    ("rogers",     "Rogers Legal"),
+    ("cppib",      "CPP Investments Legal"),
+]
+
+
+def scrape_taleo_tenant(org: str, company: str, scorer: JobScorer) -> List[dict]:
+    """Query Taleo REST API for legal roles. Falls back to HTML if REST fails."""
+    session = get_session()
+    results = []
+    # Taleo REST endpoint (Oracle Recruiting)
+    api_url = (
+        f"https://taleo.{org}.com/careersection/rest/jobboard/searchjobs"
+        f"?lang=en&portal=1&keyword=lawyer+associate+counsel"
+    )
+    try:
+        resp = session.get(api_url, timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            for job in data.get("requisitionList", []):
+                title    = job.get("jobTitle", "")
+                location = job.get("locationCode", "") or job.get("primaryLocation", "")
+                job_id   = job.get("jobId", "")
+                job_url  = f"https://taleo.{org}.com/careersection/2/jobdetail.ftl?job={job_id}"
+
+                if not _is_law_job(title):
+                    continue
+                if not _is_on_ab(location):
+                    continue
+
+                job_dict = scorer.make_job_dict(title, location, job_url, company, "taleo")
+                if job_dict:
+                    results.append(job_dict)
+    except Exception as e:
+        log.debug(f"Taleo {org}: {e}")
+    return results
+
+
+def scrape_all_taleo(scorer: JobScorer) -> List[dict]:
+    log.info(f"  [Taleo] Scanning {len(TALEO_TENANTS)} tenants...")
+    all_jobs: List[dict] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {
+            ex.submit(scrape_taleo_tenant, o, c, scorer): c
+            for o, c in TALEO_TENANTS
+        }
+        for f in concurrent.futures.as_completed(futures):
+            try:
+                all_jobs.extend(f.result())
+            except Exception:
+                pass
+    return all_jobs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. TARGET URLS — DIRECT HTML SCRAPERS
-#    BUG FIX: 10 dead/broken domains removed (DNS dead or SSL mismatch).
-#    Replaced with verified alternatives where available.
+#    v5 BUG FIX: 10 dead/broken domains removed (DNS dead or SSL mismatch).
+#    v6 BUG FIX: Duplicate foglers.com URL removed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_target_urls() -> List[str]:
@@ -1031,11 +1323,10 @@ def get_target_urls() -> List[str]:
         "https://www.stockwoods.ca/careers/",
         "https://www.brauti.com/careers/",
         "https://www.fasken.com/en/careers/students",  # Articling students page
-        "https://www.chaitons.com/careers/",           # NEW: Chaitons LLP
-        "https://www.foglers.com/career-opportunity/",
-        "https://www.lerners.ca/careers/",             # Retry — was removed in v4 due to timeout, re-adding
-        "https://sookermacleod.com/careers/",          # NEW: Sooker MacLeod
-        "https://www.gutierrezlaw.ca/careers/",        # NEW: boutique
+        "https://www.chaitons.com/careers/",           # Chaitons LLP
+        "https://www.lerners.ca/careers/",
+        "https://sookermacleod.com/careers/",          # Sooker MacLeod
+        "https://www.gutierrezlaw.ca/careers/",        # boutique
         # BUG FIX: www.hicks.ca → SSL hostname mismatch; try alternate domain
         "https://hicksadams.com/careers/",
 
@@ -1146,17 +1437,9 @@ def scrape_jobspy_wrapper(scorer: JobScorer) -> pd.DataFrame:
                         url     = str(row.get("JOB_URL",     ""))
                         company = str(row.get("COMPANY",     ""))
                         date    = str(row.get("DATE_POSTED", ""))
-                        is_fit, cat, score = scorer.score_job(title, desc, url, company)
-                        if is_fit:
-                            all_rows.append({
-                                "TITLE":    title,
-                                "COMPANY":  company,
-                                "URL":      url,
-                                "CATEGORY": cat,
-                                "SCORE":    score,
-                                "SOURCE":   "jobspy",
-                                "DATE":     date,
-                            })
+                        job_dict = scorer.make_job_dict(title, desc, url, company, "jobspy", date)
+                        if job_dict:
+                            all_rows.append(job_dict)
                 time.sleep(1)
             except Exception as e:
                 log.debug(f"JobSpy error [{search_term} / {loc}]: {e}")
@@ -1211,7 +1494,7 @@ def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
         frames.append(pd.DataFrame(lv_jobs))
     log.info(f"  → {len(lv_jobs)} raw hits from Lever")
 
-    # 5. iCIMS ATS (NEW in v5)
+    # 5. iCIMS ATS
     log.info("\n── iCIMS ATS ────────────────────────────────────────────")
     ic_jobs = scrape_all_icims(scorer)
     if ic_jobs:
@@ -1225,18 +1508,40 @@ def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
         frames.append(pd.DataFrame(gov_jobs))
     log.info(f"  → {len(gov_jobs)} raw hits from Government")
 
-    # 7. JobSpy aggregators (Indeed / LinkedIn / Google)
+    # 7. SmartRecruiters ATS (v6 — NEW)
+    log.info("\n── SmartRecruiters ATS ──────────────────────────────────")
+    sr_jobs = scrape_all_smartrecruiters(scorer)
+    if sr_jobs:
+        frames.append(pd.DataFrame(sr_jobs))
+    log.info(f"  → {len(sr_jobs)} raw hits from SmartRecruiters")
+
+    # 8. BambooHR ATS (v6 — NEW)
+    log.info("\n── BambooHR ATS ─────────────────────────────────────────")
+    bh_jobs = scrape_all_bamboohr(scorer)
+    if bh_jobs:
+        frames.append(pd.DataFrame(bh_jobs))
+    log.info(f"  → {len(bh_jobs)} raw hits from BambooHR")
+
+    # 9. Taleo ATS (v6 — NEW)
+    log.info("\n── Taleo ATS ────────────────────────────────────────────")
+    tl_jobs = scrape_all_taleo(scorer)
+    if tl_jobs:
+        frames.append(pd.DataFrame(tl_jobs))
+    log.info(f"  → {len(tl_jobs)} raw hits from Taleo")
+
+    # 10. JobSpy aggregators (Indeed / LinkedIn / Google)
     log.info("\n── JobSpy aggregators ───────────────────────────────────")
     frames.append(scrape_jobspy_wrapper(scorer))
 
     non_empty = [f for f in frames if f is not None and not f.empty]
     if not non_empty:
         return pd.DataFrame()
-    return pd.concat(non_empty, ignore_index=True, sort=False)
+    combined = pd.concat(non_empty, ignore_index=True, sort=False)
+    return apply_freshness_filter(combined)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 11. DEDUPLICATION (v5: improved fuzzy matching strips stopwords)
+# 11. DEDUPLICATION (v5+: improved fuzzy matching strips stopwords)
 # ─────────────────────────────────────────────────────────────────────────────
 
 _STOPWORDS = re.compile(
@@ -1406,76 +1711,167 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 14. MAIN
+# 14. SIMULATION MODE (v6 — NEW)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def main() -> None:
-    run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+# Synthetic job titles used for simulate-mode training warm-up.
+# Pool size of 10 ensures cycle_size=(i%15)+3 can slice any amount 3–15
+# without running out of distinct entries (we wrap with * multiplier).
+_SYNTHETIC_JOBS_POOL_MULTIPLIER = 10  # how many times to repeat the base pool
+_SYNTHETIC_JOBS = [
+    {"TITLE": "Associate Lawyer",           "COMPANY": "Bay Street Firm",   "URL": "https://example.com/job/1",  "CATEGORY": "Associate", "SCORE": 10, "CONFIDENCE": "Medium", "PRACTICE_AREA": "litigation",  "WORK_MODE": "hybrid",    "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Articling Student",           "COMPANY": "Boutique Firm",     "URL": "https://example.com/job/2",  "CATEGORY": "Student",   "SCORE": 8,  "CONFIDENCE": "Medium", "PRACTICE_AREA": "corporate",   "WORK_MODE": "in-office", "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Legal Counsel",               "COMPANY": "In-House Corp",     "URL": "https://example.com/job/3",  "CATEGORY": "Associate", "SCORE": 7,  "CONFIDENCE": "Low",    "PRACTICE_AREA": "regulatory",  "WORK_MODE": "hybrid",    "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Corporate Counsel",           "COMPANY": "Insurance Co",      "URL": "https://example.com/job/4",  "CATEGORY": "Associate", "SCORE": 7,  "CONFIDENCE": "Low",    "PRACTICE_AREA": "corporate",   "WORK_MODE": "in-office", "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Junior Associate Lawyer",     "COMPANY": "National Firm",     "URL": "https://example.com/job/5",  "CATEGORY": "Associate", "SCORE": 14, "CONFIDENCE": "Medium", "PRACTICE_AREA": "employment",  "WORK_MODE": "remote",    "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Lawyer — Litigation",         "COMPANY": "Regional Firm",     "URL": "https://example.com/job/6",  "CATEGORY": "Associate", "SCORE": 8,  "CONFIDENCE": "Medium", "PRACTICE_AREA": "litigation",  "WORK_MODE": "in-office", "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Associate (Real Estate)",     "COMPANY": "Property Firm",     "URL": "https://example.com/job/7",  "CATEGORY": "Associate", "SCORE": 10, "CONFIDENCE": "Medium", "PRACTICE_AREA": "real_estate", "WORK_MODE": "hybrid",    "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Newly Called Lawyer",         "COMPANY": "Boutique LLP",      "URL": "https://example.com/job/8",  "CATEGORY": "Associate", "SCORE": 16, "CONFIDENCE": "High",   "PRACTICE_AREA": "litigation",  "WORK_MODE": "in-office", "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Summer Student (Law)",        "COMPANY": "Big 4 Firm",        "URL": "https://example.com/job/9",  "CATEGORY": "Student",   "SCORE": 8,  "CONFIDENCE": "Medium", "PRACTICE_AREA": "general",     "WORK_MODE": "hybrid",    "SOURCE": "simulate", "DATE": ""},
+    {"TITLE": "Articling Student — Toronto", "COMPANY": "Toronto Firm",      "URL": "https://example.com/job/10", "CATEGORY": "Student",   "SCORE": 8,  "CONFIDENCE": "Medium", "PRACTICE_AREA": "general",     "WORK_MODE": "in-office", "SOURCE": "simulate", "DATE": ""},
+]
 
-    # BUG FIX: Print header BEFORE scraping so it appears at the top of logs
-    # (v4 printed it after, causing confusing out-of-order output)
+
+def simulate_training(n: int) -> None:
+    """
+    Run N synthetic training cycles to pre-warm the adaptive model.
+    This builds up keyword weights and threshold calibration without
+    hitting any live job boards. Useful for bootstrapping a fresh
+    model_weights.json.
+    """
     print("=" * 60, flush=True)
-    print("Law Associate Job Scraper — v5 Bug-Fix & Intelligence Edition", flush=True)
-    print(f"Run: {run_ts}", flush=True)
+    print(f"Law Associate Job Scraper — v{VERSION} SIMULATION MODE", flush=True)
+    print(f"Running {n} synthetic training cycle(s)...", flush=True)
     print("=" * 60, flush=True)
 
     weights = load_weights()
-    scorer  = JobScorer(weights)
 
-    print(f"\n[Model]  Score threshold : {scorer.threshold}", flush=True)
-    print(f"[Model]  Training run #   : {weights['training_runs']}", flush=True)
-    print(f"[Model]  All-time jobs    : {weights.get('total_jobs_found', 0)}", flush=True)
-    print(flush=True)
+    for i in range(1, n + 1):
+        run_ts = (
+            datetime.now(timezone.utc) - timedelta(days=n - i)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # 1. Run all scrapers
-    combined = run_all_scrapers(scorer)
+        # Vary the synthetic job count per cycle (simulates realistic variance: 3–17 jobs)
+        cycle_size = max(1, (i % 15) + 3)
+        jobs_slice = (_SYNTHETIC_JOBS * _SYNTHETIC_JOBS_POOL_MULTIPLIER)[:cycle_size]
 
-    # 2. Deduplicate
-    unique_jobs = deduplicate_jobs(combined)
-    log.info(f"After dedup: {len(unique_jobs)} unique candidates")
+        weights = train_model(weights, jobs_slice, get_target_urls(), run_ts)
 
-    # 3. History filter
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE) as f:
-                history_ids: set = set(json.load(f))
-        except Exception:
-            history_ids = set()
-    else:
-        history_ids = set()
+        if i % 10 == 0 or i == n:
+            print(
+                f"  Cycle {i:3d}/{n} | threshold={weights['score_threshold']} | "
+                f"all-time={weights['total_jobs_found']} | "
+                f"runs={weights['training_runs']}",
+                flush=True,
+            )
 
-    final_jobs: List[dict] = []
-    for _, row in unique_jobs.iterrows():
-        clean_url = str(row.get("URL", "")).split("?")[0]
-        if clean_url not in history_ids:
-            final_jobs.append(row.to_dict())
-            history_ids.add(clean_url)
-
-    final_df = pd.DataFrame(final_jobs)
-
-    # 4. Print output
-    print(f"\n{'='*60}", flush=True)
-    print(f"✓ Final Verified New Jobs: {len(final_df)}", flush=True)
-    if not final_df.empty:
-        cols = [c for c in ["TITLE", "COMPANY", "CATEGORY", "SOURCE", "SCORE"] if c in final_df.columns]
-        print(final_df[cols].to_string(index=False), flush=True)
-
-    # 5. Self-training
-    weights = train_model(weights, final_jobs, get_target_urls(), run_ts)
     save_weights(weights)
+    print(f"\n✓ Simulation complete. Weights saved to {WEIGHTS_FILE}", flush=True)
+    print(f"  Training runs: {weights['training_runs']}", flush=True)
+    print(f"  Score threshold: {weights['score_threshold']}", flush=True)
+    print(f"  Practice area totals: {weights.get('practice_area_totals', {})}", flush=True)
 
-    # 6. Persist results for dashboard
-    append_results(final_jobs, run_ts, weights)
 
-    # 7. Save history
-    try:
-        with open(HISTORY_FILE, "w") as f:
-            json.dump(list(history_ids), f)
-    except Exception as e:
-        log.warning(f"Could not save history: {e}")
+# ─────────────────────────────────────────────────────────────────────────────
+# 15. MAIN
+# ─────────────────────────────────────────────────────────────────────────────
 
-    # 8. Telegram
-    send_telegram(final_df, weights)
+def main() -> None:
+    parser = argparse.ArgumentParser(description=f"Law Associate Job Scraper v{VERSION}")
+    parser.add_argument(
+        "--simulate", metavar="N", type=int, default=0,
+        help="Run N synthetic training cycles to pre-warm the model (no live scraping)",
+    )
+    parser.add_argument(
+        "--cycles", metavar="N", type=int, default=1,
+        help="Run the full scraper+train cycle N times (max 100)",
+    )
+    args = parser.parse_args()
+
+    # Simulation mode: pre-warm model weights without hitting job boards
+    if args.simulate and args.simulate > 0:
+        simulate_training(min(args.simulate, 100))
+        return
+
+    cycles = max(1, min(args.cycles, 100))
+
+    for cycle_num in range(1, cycles + 1):
+        run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        print("=" * 60, flush=True)
+        if cycles > 1:
+            print(f"Law Associate Job Scraper — v{VERSION} [Cycle {cycle_num}/{cycles}]", flush=True)
+        else:
+            print(f"Law Associate Job Scraper — v{VERSION}", flush=True)
+        print(f"Run: {run_ts}", flush=True)
+        print("=" * 60, flush=True)
+
+        weights = load_weights()
+        scorer  = JobScorer(weights)
+
+        print(f"\n[Model]  Score threshold : {scorer.threshold}", flush=True)
+        print(f"[Model]  Training run #   : {weights['training_runs']}", flush=True)
+        print(f"[Model]  All-time jobs    : {weights.get('total_jobs_found', 0)}", flush=True)
+        print(flush=True)
+
+        # 1. Run all scrapers
+        combined = run_all_scrapers(scorer)
+
+        # 2. Deduplicate
+        unique_jobs = deduplicate_jobs(combined)
+        log.info(f"After dedup: {len(unique_jobs)} unique candidates")
+
+        # 3. History filter
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE) as f:
+                    history_ids: set = set(json.load(f))
+            except Exception:
+                history_ids = set()
+        else:
+            history_ids = set()
+
+        final_jobs: List[dict] = []
+        for _, row in unique_jobs.iterrows():
+            clean_url = str(row.get("URL", "")).split("?")[0]
+            if clean_url not in history_ids:
+                final_jobs.append(row.to_dict())
+                history_ids.add(clean_url)
+
+        final_df = pd.DataFrame(final_jobs)
+
+        # 4. Print output
+        print(f"\n{'='*60}", flush=True)
+        print(f"✓ Final Verified New Jobs: {len(final_df)}", flush=True)
+        if not final_df.empty:
+            cols = [
+                c for c in
+                ["TITLE", "COMPANY", "CATEGORY", "PRACTICE_AREA", "CONFIDENCE", "SOURCE", "SCORE"]
+                if c in final_df.columns
+            ]
+            print(final_df[cols].to_string(index=False), flush=True)
+
+        # 5. Self-training
+        weights = train_model(weights, final_jobs, get_target_urls(), run_ts)
+        save_weights(weights)
+
+        # 6. Persist results for dashboard
+        append_results(final_jobs, run_ts, weights)
+
+        # 7. Save history
+        try:
+            with open(HISTORY_FILE, "w") as f:
+                json.dump(list(history_ids), f)
+        except Exception as e:
+            log.warning(f"Could not save history: {e}")
+
+        # 8. Telegram (only on last cycle to avoid flooding)
+        if cycle_num == cycles:
+            send_telegram(final_df, weights)
+        else:
+            log.info(f"[Cycle {cycle_num}/{cycles}] Skipping Telegram (not last cycle)")
+            # Brief pause between cycles to be respectful to job boards
+            time.sleep(30)
 
 
 if __name__ == "__main__":
