@@ -108,11 +108,12 @@ HISTORY_FILE   = os.environ.get("HISTORY_FILE",   "job_history.json")
 WEIGHTS_FILE   = os.environ.get("WEIGHTS_FILE",   "model_weights.json")
 RESULTS_FILE   = os.environ.get("RESULTS_FILE",   "results.json")
 def get_int_env(name: str, default: int) -> int:
+    """Return an integer environment variable, falling back safely on bad input."""
     raw = os.environ.get(name)
     if raw is None:
         return default
 
-    raw = str(raw).strip()
+    raw = raw.strip()
     if not raw:
         return default
 
@@ -128,6 +129,7 @@ DASHBOARD_URL  = os.environ.get("DASHBOARD_URL",  "https://law-associate-job-ale
 
 MIN_TITLE_LENGTH = 15
 KEYWORD_DECAY_FACTOR = 0.97
+KEYWORD_INCREMENT = 1.0
 MIN_KEYWORD_WEIGHT = 2.0
 MAX_KEYWORD_WEIGHT = 20.0
 
@@ -329,7 +331,18 @@ def train_model(
     category_counts: Dict[str, int] = {}
     feedback = feedback or {}
     alerted_jobs = int(feedback.get("alerted_jobs", len(jobs_found)))
+    if alerted_jobs > len(jobs_found):
+        log.warning(
+            f"[Train] alerted_jobs={alerted_jobs} exceeds verified jobs={len(jobs_found)}; clamping."
+        )
+        alerted_jobs = len(jobs_found)
     repeat_jobs = int(feedback.get("repeat_jobs", max(len(jobs_found) - alerted_jobs, 0)))
+    max_repeats = max(len(jobs_found) - alerted_jobs, 0)
+    if repeat_jobs > max_repeats:
+        log.warning(
+            f"[Train] repeat_jobs={repeat_jobs} exceeds remaining verified jobs={max_repeats}; clamping."
+        )
+        repeat_jobs = max_repeats
 
     for job in jobs_found:
         try:
@@ -387,11 +400,14 @@ def train_model(
         title = str(job.get("TITLE", "")).lower()
         for word in kw:
             if word in title:
-                kw[word] = min(float(kw[word]) + 1.0, MAX_KEYWORD_WEIGHT)
+                current = float(kw[word])
+                kw[word] = round(min(current + KEYWORD_INCREMENT, MAX_KEYWORD_WEIGHT), 2)
                 seen_keywords.add(word)
     for word in kw:
-        if word not in seen_keywords:
-            kw[word] = round(max(float(kw[word]) * KEYWORD_DECAY_FACTOR, MIN_KEYWORD_WEIGHT), 2)
+        current = float(kw[word])
+        if word in seen_keywords or current <= MIN_KEYWORD_WEIGHT:
+            continue
+        kw[word] = round(max(current * KEYWORD_DECAY_FACTOR, MIN_KEYWORD_WEIGHT), 2)
 
     summary = {
         "timestamp":      run_timestamp,
@@ -1072,8 +1088,8 @@ def get_target_urls() -> List[str]:
         "https://goldblattpartners.com/careers/",
         "https://www.siskinds.com/careers/",
         # BUG FIX: www.kellylawyers.ca → DNS dead, REMOVED
-        # BUG FIX: www.daviesward.com → DNS dead, replaced with apex domain
-        # to avoid SSL hostname mismatch on the www subdomain.
+        # BUG FIX: www.daviesward.com → DNS dead, replaced with the site's
+        # canonical apex domain to avoid SSL hostname mismatch on www.
         "https://davies.ca/careers/",
         "https://www.kmlaw.ca/careers/",               # Koskie Minsky
         "https://www.sotos.ca/careers/",

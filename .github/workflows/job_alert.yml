@@ -24,7 +24,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Restore cached job history so we don't re-alert the same listings
+      # Restore the latest prior cache entry, then save a fresh immutable cache at
+      # the end of this run. GitHub Actions caches cannot be overwritten in place.
       - name: Restore job history cache
         uses: actions/cache/restore@v4
         with:
