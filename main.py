@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Law Associate Job Scraper — v5 (Bug-Fix & Intelligence Edition)
+Law Associate Job Scraper — v6 (Adaptive Self-Training Edition)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BUGS FIXED vs v4 (confirmed from 2026-03-09 live log analysis):
 
@@ -61,6 +61,7 @@ MODEL IMPROVEMENTS:
 
 from __future__ import annotations
 
+import copy
 import os
 import re
 import json
@@ -106,10 +107,31 @@ _HEADERS = {
 HISTORY_FILE   = os.environ.get("HISTORY_FILE",   "job_history.json")
 WEIGHTS_FILE   = os.environ.get("WEIGHTS_FILE",   "model_weights.json")
 RESULTS_FILE   = os.environ.get("RESULTS_FILE",   "results.json")
-RESULTS_WANTED = int(os.environ.get("RESULTS_WANTED") or "30")
+def get_int_env(name: str, default: int) -> int:
+    """Return an integer environment variable, falling back safely on bad input."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+
+    raw = raw.strip()
+    if not raw:
+        return default
+
+    try:
+        return int(raw)
+    except ValueError:
+        log.warning(f"Invalid integer for {name}={raw!r}; using default {default}.")
+        return default
+
+
+RESULTS_WANTED = get_int_env("RESULTS_WANTED", 30)
 DASHBOARD_URL  = os.environ.get("DASHBOARD_URL",  "https://law-associate-job-alerts.vercel.app/")
 
 MIN_TITLE_LENGTH = 15
+KEYWORD_DECAY_FACTOR = 0.97
+KEYWORD_INCREMENT = 1.0
+MIN_KEYWORD_WEIGHT = 2.0
+MAX_KEYWORD_WEIGHT = 20.0
 
 BLOCKED_DOMAINS = {
     "emond",           # Legal publisher (textbooks), NOT a law firm
@@ -246,7 +268,7 @@ TRUSTED_CA_DOMAINS = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 DEFAULT_WEIGHTS: Dict[str, Any] = {
-    "version":         5,
+    "version":         6,
     "training_runs":   0,
     "last_trained":    None,
     "score_threshold": 5,
@@ -263,18 +285,26 @@ DEFAULT_WEIGHTS: Dict[str, Any] = {
 }
 
 
+def merge_default_weights(data: Dict[str, Any]) -> Dict[str, Any]:
+    merged = copy.deepcopy(data)
+    for key, value in DEFAULT_WEIGHTS.items():
+        if key not in merged:
+            merged[key] = copy.deepcopy(value)
+        elif isinstance(value, dict) and isinstance(merged[key], dict):
+            for subkey, subvalue in value.items():
+                merged[key].setdefault(subkey, copy.deepcopy(subvalue))
+    return merged
+
+
 def load_weights() -> Dict[str, Any]:
     if os.path.exists(WEIGHTS_FILE):
         try:
             with open(WEIGHTS_FILE) as f:
                 data = json.load(f)
-            for k, v in DEFAULT_WEIGHTS.items():
-                if k not in data:
-                    data[k] = v
-            return data
+            return merge_default_weights(data)
         except Exception as e:
             log.warning(f"Could not load weights: {e}. Using defaults.")
-    return dict(DEFAULT_WEIGHTS)
+    return copy.deepcopy(DEFAULT_WEIGHTS)
 
 
 def save_weights(weights: Dict[str, Any]) -> None:
@@ -290,6 +320,7 @@ def train_model(
     jobs_found:    List[dict],
     sites_scanned: List[str],
     run_timestamp: str,
+    feedback:      Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Update model weights based on this run's results.
@@ -297,6 +328,21 @@ def train_model(
     """
     hit_domains: set = set()
     source_counts: Dict[str, int] = {}
+    category_counts: Dict[str, int] = {}
+    feedback = feedback or {}
+    alerted_jobs = int(feedback.get("alerted_jobs", len(jobs_found)))
+    if alerted_jobs > len(jobs_found):
+        log.warning(
+            f"[Train] alerted_jobs={alerted_jobs} exceeds verified jobs={len(jobs_found)}; clamping."
+        )
+        alerted_jobs = len(jobs_found)
+    repeat_jobs = int(feedback.get("repeat_jobs", max(len(jobs_found) - alerted_jobs, 0)))
+    max_repeats = max(len(jobs_found) - alerted_jobs, 0)
+    if repeat_jobs > max_repeats:
+        log.warning(
+            f"[Train] repeat_jobs={repeat_jobs} exceeds remaining verified jobs={max_repeats}; clamping."
+        )
+        repeat_jobs = max_repeats
 
     for job in jobs_found:
         try:
@@ -306,6 +352,8 @@ def train_model(
             pass
         source = job.get("SOURCE", "unknown")
         source_counts[source] = source_counts.get(source, 0) + 1
+        category = job.get("CATEGORY", "Unknown")
+        category_counts[category] = category_counts.get(category, 0) + 1
 
     # Site productivity tracking
     for site_url in sites_scanned:
@@ -337,25 +385,40 @@ def train_model(
     if n == 0 and threshold > 3:
         threshold -= 1
         log.info(f"[Train] No results → lowering threshold to {threshold}")
+    elif n > 0 and alerted_jobs == 0:
+        log.info(f"[Train] {n} verified jobs were already in history → keeping threshold at {threshold}")
     elif n > 30 and threshold < 12:
         threshold += 1
         log.info(f"[Train] Many results ({n}) → raising threshold to {threshold}")
     weights["score_threshold"] = threshold
 
-    # Keyword weight evolution (titles that matched)
+    # Keyword weight evolution (train on all verified output from this run,
+    # not just newly alerted rows, and gently decay absent terms)
     kw = weights["keyword_weights"]
+    seen_keywords = set()
     for job in jobs_found:
         title = str(job.get("TITLE", "")).lower()
         for word in kw:
             if word in title:
-                kw[word] = min(kw[word] + 1, 20)
+                current = float(kw[word])
+                kw[word] = round(min(current + KEYWORD_INCREMENT, MAX_KEYWORD_WEIGHT), 2)
+                seen_keywords.add(word)
+    for word in kw:
+        current = float(kw[word])
+        if word in seen_keywords or current <= MIN_KEYWORD_WEIGHT:
+            continue
+        kw[word] = round(max(current * KEYWORD_DECAY_FACTOR, MIN_KEYWORD_WEIGHT), 2)
 
     summary = {
         "timestamp":      run_timestamp,
         "jobs_found":     n,
+        "alerted_jobs":   alerted_jobs,
+        "repeat_jobs":    repeat_jobs,
         "sites_hit":      list(hit_domains),
         "threshold":      weights["score_threshold"],
         "source_breakdown": source_counts,
+        "category_breakdown": category_counts,
+        "keywords_seen":  sorted(seen_keywords),
     }
     weights["run_history"]      = (weights["run_history"] + [summary])[-50:]
     weights["training_runs"]   += 1
@@ -364,6 +427,7 @@ def train_model(
 
     log.info(
         f"[Train] Run #{weights['training_runs']} | Jobs: {n} | "
+        f"Alerts: {alerted_jobs} | Repeats: {repeat_jobs} | "
         f"Threshold: {weights['score_threshold']} | All-time: {weights['total_jobs_found']} | "
         f"Sources: {source_counts}"
     )
@@ -371,7 +435,7 @@ def train_model(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. JOB SCORER  (v5 — with junior-signal boost and ordinal-year block)
+# 4. JOB SCORER  (v6 — with junior-signal boost and ordinal-year block)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class JobScorer:
@@ -1024,8 +1088,9 @@ def get_target_urls() -> List[str]:
         "https://goldblattpartners.com/careers/",
         "https://www.siskinds.com/careers/",
         # BUG FIX: www.kellylawyers.ca → DNS dead, REMOVED
-        # BUG FIX: www.daviesward.com → DNS dead, replaced with correct domain
-        "https://www.davies.ca/careers/",
+        # BUG FIX: www.daviesward.com → DNS dead, replaced with the site's
+        # canonical apex domain to avoid SSL hostname mismatch on www.
+        "https://davies.ca/careers/",
         "https://www.kmlaw.ca/careers/",               # Koskie Minsky
         "https://www.sotos.ca/careers/",
         "https://www.stockwoods.ca/careers/",
@@ -1034,8 +1099,8 @@ def get_target_urls() -> List[str]:
         "https://www.chaitons.com/careers/",           # NEW: Chaitons LLP
         "https://www.foglers.com/career-opportunity/",
         "https://www.lerners.ca/careers/",             # Retry — was removed in v4 due to timeout, re-adding
-        "https://sookermacleod.com/careers/",          # NEW: Sooker MacLeod
-        "https://www.gutierrezlaw.ca/careers/",        # NEW: boutique
+        # BUG FIX: removed dead domains from live logs
+        # sookermacleod.com, gutierrezlaw.ca
         # BUG FIX: www.hicks.ca → SSL hostname mismatch; try alternate domain
         "https://hicksadams.com/careers/",
 
@@ -1048,10 +1113,10 @@ def get_target_urls() -> List[str]:
         # BUG FIX: www.burnetduckworth.com, www.matholaw.ca,
         #          www.shortoil.ca, www.mcleodlaw.com → dead/SSL, REMOVED
         # Replacements:
-        "https://www.burntsand.com/careers/",          # AB boutique
         "https://www.emeryjamieson.com/careers/",      # NEW: Edmonton firm
         "https://www.jmccormick.ca/careers/",          # NEW: AB litigation
-        "https://www.mustardlaw.ca/careers/",          # NEW: AB boutique
+        # BUG FIX: removed dead domains from live logs
+        # burntsand.com, mustardlaw.ca
 
         # ── International Firms (Canadian offices only) ───────────────────────
         "https://www.dentons.com/en/careers/find-a-job",
@@ -1415,7 +1480,7 @@ def main() -> None:
     # BUG FIX: Print header BEFORE scraping so it appears at the top of logs
     # (v4 printed it after, causing confusing out-of-order output)
     print("=" * 60, flush=True)
-    print("Law Associate Job Scraper — v5 Bug-Fix & Intelligence Edition", flush=True)
+    print("Law Associate Job Scraper — v6 Adaptive Self-Training Edition", flush=True)
     print(f"Run: {run_ts}", flush=True)
     print("=" * 60, flush=True)
 
@@ -1461,7 +1526,17 @@ def main() -> None:
         print(final_df[cols].to_string(index=False), flush=True)
 
     # 5. Self-training
-    weights = train_model(weights, final_jobs, get_target_urls(), run_ts)
+    verified_jobs = unique_jobs.to_dict("records") if not unique_jobs.empty else []
+    weights = train_model(
+        weights,
+        verified_jobs,
+        get_target_urls(),
+        run_ts,
+        feedback={
+            "alerted_jobs": len(final_jobs),
+            "repeat_jobs": max(len(verified_jobs) - len(final_jobs), 0),
+        },
+    )
     save_weights(weights)
 
     # 6. Persist results for dashboard

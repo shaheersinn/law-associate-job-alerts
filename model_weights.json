@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 6,
   "training_runs": 0,
   "last_trained": null,
   "score_threshold": 5,
@@ -10,11 +10,13 @@
     "attorney": 8,
     "solicitor": 6,
     "juriste": 6,
-    "articling": 5,
+    "articling": 8,
     "student": 4,
-    "summer": 3
+    "summer": 5
   },
   "site_productivity": {},
+  "source_stats": {},
   "run_history": [],
-  "total_jobs_found": 0
+  "total_jobs_found": 0,
+  "false_positive_domains": []
 }
