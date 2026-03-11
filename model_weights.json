@@ -1,23 +1,477 @@
 {
   "version": 6,
-  "training_runs": 0,
-  "last_trained": null,
+  "training_runs": 2,
+  "last_trained": "2026-03-11T00:56:05Z",
   "score_threshold": 5,
   "keyword_weights": {
-    "associate": 10,
-    "lawyer": 8,
-    "counsel": 7,
-    "attorney": 8,
-    "solicitor": 6,
-    "juriste": 6,
-    "articling": 8,
-    "student": 4,
-    "summer": 5
+    "associate": 11.0,
+    "lawyer": 9.0,
+    "counsel": 8.0,
+    "attorney": 7.527,
+    "solicitor": 5.645,
+    "juriste": 5.645,
+    "articling": 9.0,
+    "student": 5.0,
+    "summer": 4.704
   },
-  "site_productivity": {},
-  "source_stats": {},
-  "practice_area_totals": {},
-  "run_history": [],
-  "total_jobs_found": 0,
+  "site_productivity": {
+    "joinblakes": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "bennettjones": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "fasken": {
+      "hits": 0,
+      "runs": 4,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "gowlingwlg": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "stikeman": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "dwpv": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "mccarthy": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "torys": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "goodmans": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "blg": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "millerthomson": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "cassels": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "airdberlis": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "osler": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "litigate": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "wildlaw": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "weirfoulds": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "tgf": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "blaney": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "foglers": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "singleton": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "paliareroland": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "cohenhighley": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "hicksmorley": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "glaholt": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "shibleyrighton": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "carters": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "cavalluzzo": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "goldblattpartners": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "siskinds": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "davies": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "kmlaw": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "sotos": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "stockwoods": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "brauti": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "chaitons": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "lerners": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "sookermacleod": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "gutierrezlaw": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "hicksadams": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "fieldlaw": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "bdplaw": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "parlee": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "mross": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "brownleelaw": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "burntsand": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "emeryjamieson": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "jmccormick": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "mustardlaw": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "dentons": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "nortonrosefulbright": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "dlapiper": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "careers": {
+      "hits": 0,
+      "runs": 10,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "linklaters": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "zsa": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "thecounselnetwork": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "legaljobs": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "oba": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "lawsociety": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "lso": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "cba": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "jobs": {
+      "hits": 0,
+      "runs": 8,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "sunlife": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "enbridge": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "suncor": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "cibc": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "ultravires": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "osgoode": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "ca": {
+      "hits": 0,
+      "runs": 10,
+      "rate": 0.0,
+      "last_hit": null
+    },
+    "glassdoor": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null
+    }
+  },
+  "source_stats": {
+    "simulate": {
+      "total_jobs": 9,
+      "total_runs": 2
+    }
+  },
+  "practice_area_totals": {
+    "litigation": 2,
+    "corporate": 4,
+    "regulatory": 2,
+    "employment": 1
+  },
+  "run_history": [
+    {
+      "timestamp": "2026-03-10T00:56:05Z",
+      "jobs_found": 4,
+      "sites_hit": [
+        "example"
+      ],
+      "threshold": 5,
+      "source_breakdown": {
+        "simulate": 4
+      }
+    },
+    {
+      "timestamp": "2026-03-11T00:56:05Z",
+      "jobs_found": 5,
+      "sites_hit": [
+        "example"
+      ],
+      "threshold": 5,
+      "source_breakdown": {
+        "simulate": 5
+      }
+    }
+  ],
+  "total_jobs_found": 9,
   "false_positive_domains": []
 }
