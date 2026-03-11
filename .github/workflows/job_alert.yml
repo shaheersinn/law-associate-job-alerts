@@ -26,12 +26,20 @@ jobs:
 
       # Restore cached job history so we don't re-alert the same listings
       - name: Restore job history cache
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v4
         with:
           path: job_history.json
-          key: job-history-${{ runner.os }}
+          key: job-history-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
-            job-history-
+            job-history-${{ runner.os }}-
+
+      - name: Restore model weights cache
+        uses: actions/cache/restore@v4
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            model-weights-${{ runner.os }}-
 
       - name: Run job alert script
         env:
@@ -39,13 +47,22 @@ jobs:
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           RESULTS_WANTED:     ${{ secrets.RESULTS_WANTED }}
           HISTORY_FILE:       job_history.json
+          WEIGHTS_FILE:       model_weights.json
+          RESULTS_FILE:       results.json
         run: |
           python main.py
 
       # Save updated history for next run
       - name: Save job history cache
         if: always()
-        uses: actions/cache@v3
+        uses: actions/cache/save@v4
         with:
           path: job_history.json
-          key: job-history-${{ runner.os }}
+          key: job-history-${{ runner.os }}-${{ github.run_number }}
+
+      - name: Save model weights cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}-${{ github.run_number }}
