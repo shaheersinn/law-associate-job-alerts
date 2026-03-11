@@ -228,6 +228,9 @@ RE_BAD_LOCATIONS = re.compile(
     re.IGNORECASE,
 )
 
+KEYWORD_DECAY_RATE = 0.97   # weight multiplier per run for absent keywords
+KEYWORD_MIN_WEIGHT = 1.0   # floor so no keyword ever reaches zero
+
 TRUSTED_CA_DOMAINS = {
     "blakes", "bennettjones", "fasken", "gowlingwlg", "stikeman", "dwpv",
     "mccarthy", "torys", "goodmans", "blg", "millerthomson", "cassels",
@@ -342,13 +345,19 @@ def train_model(
         log.info(f"[Train] Many results ({n}) → raising threshold to {threshold}")
     weights["score_threshold"] = threshold
 
-    # Keyword weight evolution (titles that matched)
+    # Keyword weight evolution (boost present, decay absent at 0.97×/run)
     kw = weights["keyword_weights"]
+    found_kws: set = set()
     for job in jobs_found:
-        title = str(job.get("TITLE", "")).lower()
+        title_l = str(job.get("TITLE", "")).lower()
         for word in kw:
-            if word in title:
-                kw[word] = min(kw[word] + 1, 20)
+            if word in title_l:
+                found_kws.add(word)
+    for word in kw:
+        if word in found_kws:
+            kw[word] = min(round(kw[word] + 1), 20)
+        else:
+            kw[word] = max(round(kw[word] * KEYWORD_DECAY_RATE, 3), KEYWORD_MIN_WEIGHT)
 
     summary = {
         "timestamp":      run_timestamp,
@@ -581,7 +590,7 @@ LAW_KEYWORDS = re.compile(
 )
 
 def _is_law_job(title: str, dept: str = "", loc: str = "") -> bool:
-    return bool(LAW_KEYWORDS.search(title) or LAW_KEYWORDS.search(dept))
+    return bool(LAW_KEYWORDS.search(title) or LAW_KEYWORDS.search(dept) or LAW_KEYWORDS.search(loc))
 
 def _is_on_ab(location: str) -> bool:
     if not location:
@@ -1032,7 +1041,6 @@ def get_target_urls() -> List[str]:
         "https://www.brauti.com/careers/",
         "https://www.fasken.com/en/careers/students",  # Articling students page
         "https://www.chaitons.com/careers/",           # NEW: Chaitons LLP
-        "https://www.foglers.com/career-opportunity/",
         "https://www.lerners.ca/careers/",             # Retry — was removed in v4 due to timeout, re-adding
         "https://sookermacleod.com/careers/",          # NEW: Sooker MacLeod
         "https://www.gutierrezlaw.ca/careers/",        # NEW: boutique
@@ -1275,6 +1283,32 @@ def deduplicate_jobs(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=["SIG", "CLEAN_URL"])
 
 
+def apply_freshness_filter(df: pd.DataFrame, max_days: int = 40) -> pd.DataFrame:
+    """Drop rows whose DATE is parseable and older than max_days. Keeps rows with no date."""
+    if df.empty or "DATE" not in df.columns:
+        return df
+
+    today = datetime.now(timezone.utc).date()
+
+    def _is_fresh(date_str: Any) -> bool:
+        s = str(date_str).strip()
+        if s in ("", "nan", "None", "NaT"):
+            return True  # no date info — keep the job
+        try:
+            # s[:10] extracts the YYYY-MM-DD portion from ISO 8601 date strings
+            d = datetime.fromisoformat(s[:10]).date()
+            return (today - d).days <= max_days
+        except Exception:
+            return True  # unparseable date — keep the job
+
+    before = len(df)
+    df = df[df["DATE"].apply(_is_fresh)].copy()
+    dropped = before - len(df)
+    if dropped:
+        log.info(f"[Freshness] Dropped {dropped} stale job(s) older than {max_days} days.")
+    return df
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 12. RESULTS JSON
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1433,6 +1467,10 @@ def main() -> None:
     # 2. Deduplicate
     unique_jobs = deduplicate_jobs(combined)
     log.info(f"After dedup: {len(unique_jobs)} unique candidates")
+
+    # 2b. Freshness filter — drop stale postings (>40 days old)
+    unique_jobs = apply_freshness_filter(unique_jobs)
+    log.info(f"After freshness filter: {len(unique_jobs)} candidates")
 
     # 3. History filter
     if os.path.exists(HISTORY_FILE):
