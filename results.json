@@ -1,7 +1,614 @@
 {
-  "last_updated": null,
-  "total_all_time": 0,
-  "training_runs": 0,
+  "last_updated": "2026-03-13T15:23:45Z",
+  "total_all_time": 13,
+  "training_runs": 1,
   "score_threshold": 5,
-  "runs": []
+  "runs": [
+    {
+      "run_id": "20260313T152345Z",
+      "timestamp": "2026-03-13T15:23:45Z",
+      "jobs_found": 13,
+      "training_run": 1,
+      "threshold": 5,
+      "source_breakdown": {
+        "direct-html": 2,
+        "jobspy": 11
+      },
+      "jobs": [
+        {
+          "TITLE": "Associate Positions",
+          "COMPANY": "Goldblattpartners",
+          "URL": "https://goldblattpartners.com/careers/associate-positions/",
+          "CATEGORY": "Associate",
+          "SCORE": 12,
+          "SOURCE": "direct-html",
+          "DATE": ""
+        },
+        {
+          "TITLE": "Summer Student Programs",
+          "COMPANY": "Chaitons",
+          "URL": "https://www.chaitons.com/careers/summer-student-programs",
+          "CATEGORY": "Student",
+          "SCORE": 7,
+          "SOURCE": "direct-html",
+          "DATE": ""
+        },
+        {
+          "TITLE": "Associate Real Estate Lawyer",
+          "COMPANY": "Tarnowecky Law Professional Corporation",
+          "URL": "https://ca.indeed.com/viewjob?jk=fc35bcf4dfa04f35",
+          "CATEGORY": "Associate",
+          "SCORE": 16,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-11"
+        },
+        {
+          "TITLE": "Legal Counsel (12 months)",
+          "COMPANY": "Legal Aid Ontario",
+          "URL": "https://www.linkedin.com/jobs/view/4383278597",
+          "CATEGORY": "Associate",
+          "SCORE": 12,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-12"
+        },
+        {
+          "TITLE": "Future Opportunities: Lawyers & Legal Counsel - 2026",
+          "COMPANY": "The Mirillion Group",
+          "URL": "https://www.linkedin.com/jobs/view/4315209937",
+          "CATEGORY": "Associate",
+          "SCORE": 12,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-11"
+        },
+        {
+          "TITLE": "Senior Law Librarian / Research Attorney",
+          "COMPANY": "Mercor",
+          "URL": "https://www.linkedin.com/jobs/view/4383106781",
+          "CATEGORY": "Associate",
+          "SCORE": 12,
+          "SOURCE": "jobspy",
+          "DATE": "nan"
+        },
+        {
+          "TITLE": "Senior Legal Counsel",
+          "COMPANY": "Greater Toronto Airports Authority",
+          "URL": "https://www.linkedin.com/jobs/view/4384204528",
+          "CATEGORY": "Associate",
+          "SCORE": 10,
+          "SOURCE": "jobspy",
+          "DATE": "nan"
+        },
+        {
+          "TITLE": "HR / Finance / Legal Associate Interest Form",
+          "COMPANY": "StaffCo Io.",
+          "URL": "https://www.linkedin.com/jobs/view/4384593132",
+          "CATEGORY": "Associate",
+          "SCORE": 10,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-12"
+        },
+        {
+          "TITLE": "Associate Lawyer - Labour & Employment (Junior to Mid-Level Position)",
+          "COMPANY": "Urban Legal Recruitment Inc.",
+          "URL": "https://www.linkedin.com/jobs/view/4382802025",
+          "CATEGORY": "Associate",
+          "SCORE": 12,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-10"
+        },
+        {
+          "TITLE": "Lawyer - Litigator (ID: 54731)",
+          "COMPANY": "City of Edmonton",
+          "URL": "https://www.linkedin.com/jobs/view/4379896438",
+          "CATEGORY": "Associate",
+          "SCORE": 12,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-06"
+        },
+        {
+          "TITLE": "Articling Student",
+          "COMPANY": "Export Development Canada | Exportation et d\u00e9veloppement Canada",
+          "URL": "https://www.linkedin.com/jobs/view/4381041770",
+          "CATEGORY": "Student",
+          "SCORE": 7,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-10"
+        },
+        {
+          "TITLE": "2026/27 Articling Student - Criminal & Family (Brockville)",
+          "COMPANY": "Legal Aid Ontario",
+          "URL": "https://www.linkedin.com/jobs/view/4380000406",
+          "CATEGORY": "Student",
+          "SCORE": 7,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-10"
+        },
+        {
+          "TITLE": "Articling Student (2027-2028)",
+          "COMPANY": "City of Mississauga",
+          "URL": "https://www.linkedin.com/jobs/view/4381843968",
+          "CATEGORY": "Student",
+          "SCORE": 7,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-09"
+        }
+      ]
+    }
+  ],
+  "site_productivity": {
+    "joinblakes": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "bennettjones": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "fasken": {
+      "hits": 0,
+      "runs": 2,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 2
+    },
+    "gowlingwlg": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "stikeman": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "dwpv": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "mccarthy": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "torys": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "goodmans": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "blg": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "millerthomson": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "cassels": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "airdberlis": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "osler": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "davies": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "litigate": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "wildlaw": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "weirfoulds": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "tgf": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "blaney": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "foglers": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "singleton": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "paliareroland": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "cohenhighley": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "hicksmorley": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "glaholt": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "shibleyrighton": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "carters": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "cavalluzzo": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "goldblattpartners": {
+      "hits": 1,
+      "runs": 1,
+      "rate": 1.0,
+      "last_hit": "2026-03-13T15:23:45Z",
+      "consecutive_zeros": 0
+    },
+    "siskinds": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "kmlaw": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "sotos": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "stockwoods": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "brauti": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "chaitons": {
+      "hits": 1,
+      "runs": 1,
+      "rate": 1.0,
+      "last_hit": "2026-03-13T15:23:45Z",
+      "consecutive_zeros": 0
+    },
+    "lerners": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "hicksadams": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "fieldlaw": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "bdplaw": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "parlee": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "mross": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "brownleelaw": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "emeryjamieson": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "jmccormick": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "dentons": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "nortonrosefulbright": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "dlapiper": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "careers": {
+      "hits": 0,
+      "runs": 5,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 5
+    },
+    "linklaters": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "zsa": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "thecounselnetwork": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "legaljobs": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "oba": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "lawsociety": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "lso": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "cba": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "jobs": {
+      "hits": 0,
+      "runs": 4,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 4
+    },
+    "sunlife": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "enbridge": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "suncor": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "cibc": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "ultravires": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "osgoode": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "ca": {
+      "hits": 5,
+      "runs": 5,
+      "rate": 1.0,
+      "last_hit": "2026-03-13T15:23:45Z",
+      "consecutive_zeros": 0
+    },
+    "glassdoor": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    }
+  },
+  "source_stats": {
+    "direct-html": {
+      "total_jobs": 2,
+      "total_runs": 1,
+      "avg_per_run": 2.0
+    },
+    "jobspy": {
+      "total_jobs": 11,
+      "total_runs": 1,
+      "avg_per_run": 11.0
+    }
+  }
 }
