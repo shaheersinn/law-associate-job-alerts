@@ -1,51 +1,103 @@
-name: Weekly Law Associate Job Alerts
+name: Law Associate Job Alerts
 
 on:
-  # Run every Monday at 14:00 UTC (09:00 Eastern Time)
   schedule:
-    - cron: '0 14 * * 1'
-  # Allow manual dispatch
-  workflow_dispatch:
+    - cron: '0 */2 * * *'   # every 2 hours
+  workflow_dispatch:         # allow manual trigger from Actions tab
+
+# BUG FIX: Must be `write` so the bot can git-push results.json back.
+# Without this, the dashboard reads a permanently-empty file from the repo.
+permissions:
+  contents: write
 
 jobs:
-  build:
+  scrape:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v3
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python ────────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # ── 3. Install dependencies ──────────────────────────────────────────
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Restore cached job history so we don't re-alert the same listings
+      # ── 4. Restore caches ────────────────────────────────────────────────
+      # BUG FIX: Use separate restore@v4 + save@v4 steps (NOT combined cache@v3).
+      # The combined cache@v3 with a static key NEVER saves on a cache-hit
+      # (GitHub refuses to overwrite an existing cache), so job_history.json
+      # was never persisted and every run re-alerted every previously-seen job.
+      # Using run_number in the key forces a fresh save on every run.
       - name: Restore job history cache
-        uses: actions/cache@v3
+        id: cache-history
+        uses: actions/cache/restore@v4
         with:
           path: job_history.json
-          key: job-history-${{ runner.os }}
+          key: job-history-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
-            job-history-
+            job-history-${{ runner.os }}-
 
+      - name: Restore model weights cache
+        id: cache-weights
+        uses: actions/cache/restore@v4
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            model-weights-${{ runner.os }}-
+
+      # ── 5. Run scraper ───────────────────────────────────────────────────
       - name: Run job alert script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           RESULTS_WANTED:     ${{ secrets.RESULTS_WANTED }}
           HISTORY_FILE:       job_history.json
-        run: |
-          python main.py
+          WEIGHTS_FILE:       model_weights.json
+          RESULTS_FILE:       results.json
+          DASHBOARD_URL:      https://law-associate-job-alerts.vercel.app/
+        run: python main.py
 
-      # Save updated history for next run
+      # ── 6. Save caches ───────────────────────────────────────────────────
+      # BUG FIX: Separate save step with run_number key writes a new cache
+      # entry every run regardless of whether the restore found a hit.
       - name: Save job history cache
         if: always()
-        uses: actions/cache@v3
+        uses: actions/cache/save@v4
         with:
           path: job_history.json
-          key: job-history-${{ runner.os }}
+          key: job-history-${{ runner.os }}-${{ github.run_number }}
+
+      - name: Save model weights cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: model_weights.json
+          key: model-weights-${{ runner.os }}-${{ github.run_number }}
+
+      # ── 7. Commit results + weights back to repo ─────────────────────────
+      # BUG FIX (DASHBOARD): The old workflow had NO git-commit step.
+      # results.json was produced on the runner's disk and then discarded,
+      # so the Vercel dashboard always read the empty seed file.
+      # This step pushes the updated results.json (and model_weights.json)
+      # back to the repo after every run so the dashboard stays live.
+      # [skip ci] prevents this commit from triggering another workflow run.
+      - name: Commit updated results to repo
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results.json model_weights.json || true
+          git diff --cached --quiet || git commit -m "chore: update results & weights [skip ci]"
+          git push || true
