@@ -9,39 +9,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
-   LEXSCAN — PARCHMENT & GOLD EDITION
-   Warm cream base · rich gold accent · premium legal document feel
+   LEXSCAN — PARCHMENT & GOLD + GMAIL EDITION
 ═══════════════════════════════════════════════════════════════════════ */
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
-  /* ── Parchment backgrounds ── */
-  --parch-0:   #FBF7F0;   /* page base */
-  --parch-1:   #F7F2E8;   /* hero / sections */
-  --parch-2:   #F2EBD9;   /* subtle hover */
-  --parch-3:   #EBE1CC;   /* input fills */
-  --card:      #FFFEF9;   /* white-ish cards */
-
-  /* ── Borders ── */
+  --parch-0:   #FBF7F0;
+  --parch-1:   #F7F2E8;
+  --parch-2:   #F2EBD9;
+  --parch-3:   #EBE1CC;
+  --card:      #FFFEF9;
   --line:      #E4D9C3;
   --line2:     #D5C8AD;
-
-  /* ── Gold system ── */
-  --gold:      #A8782A;   /* primary gold */
-  --gold2:     #C4912F;   /* mid gold */
-  --gold3:     #DEB96A;   /* light gold */
-  --gold4:     #F2D98A;   /* pale gold highlight */
+  --gold:      #A8782A;
+  --gold2:     #C4912F;
+  --gold3:     #DEB96A;
+  --gold4:     #F2D98A;
   --gold-sub:  rgba(168,120,42,0.08);
   --gold-glow: rgba(168,120,42,0.15);
-
-  /* ── Ink (text) ── */
-  --ink-1:     #2A2117;   /* deep warm black */
-  --ink-2:     #5C4E36;   /* medium warm brown */
-  --ink-3:     #9A8A6E;   /* muted caption */
-  --ink-4:     #C4B89A;   /* placeholder / disabled */
-
-  /* ── Semantic ── */
+  --ink-1:     #2A2117;
+  --ink-2:     #5C4E36;
+  --ink-3:     #9A8A6E;
+  --ink-4:     #C4B89A;
   --green:     #2D7A50;
   --green-sub: rgba(45,122,80,0.08);
   --green-ln:  rgba(45,122,80,0.2);
@@ -49,42 +37,29 @@
   --blue-sub:  rgba(42,95,168,0.08);
   --blue-ln:   rgba(42,95,168,0.2);
   --red:       #B03030;
-
-  /* ── Shadows ── */
-  --sh-sm:  0 1px 3px rgba(80,50,10,0.07), 0 1px 2px rgba(80,50,10,0.04);
-  --sh-md:  0 4px 16px rgba(80,50,10,0.08), 0 1px 4px rgba(80,50,10,0.04);
-  --sh-card:0 2px 8px rgba(80,50,10,0.06), 0 0 0 1px rgba(80,50,10,0.04);
+  --red-sub:   rgba(176,48,48,0.07);
+  --red-ln:    rgba(176,48,48,0.2);
+  --sh-sm:     0 1px 3px rgba(80,50,10,0.07), 0 1px 2px rgba(80,50,10,0.04);
+  --sh-md:     0 4px 16px rgba(80,50,10,0.08), 0 1px 4px rgba(80,50,10,0.04);
 }
-
 html { scroll-behavior: smooth; }
-
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--parch-1); }
 ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
-
 body {
   font-family: 'Outfit', sans-serif;
-  background: var(--parch-0);
-  color: var(--ink-1);
-  min-height: 100vh;
-  font-size: 14.5px;
-  line-height: 1.65;
+  background: var(--parch-0); color: var(--ink-1);
+  min-height: 100vh; font-size: 14.5px; line-height: 1.65;
 }
-
-/* ── Parchment texture ── */
 body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/%3E%3C/svg%3E");
   mix-blend-mode: multiply;
 }
-
 .shell { position: relative; z-index: 1; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   HEADER
-═══════════════════════════════════════════════════════════════════════ */
+/* ── HEADER ──────────────────────────────────────────── */
 header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 44px; height: 68px;
@@ -93,533 +68,283 @@ header {
   border-bottom: 1px solid var(--line);
   position: sticky; top: 0; z-index: 100;
 }
-
 .logo { display: flex; align-items: center; gap: 14px; text-decoration: none; }
-
 .logo-seal {
   width: 40px; height: 40px; border-radius: 10px;
   background: linear-gradient(145deg, var(--gold) 0%, var(--gold2) 60%, #8B6220 100%);
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; color: #FFF8E8; flex-shrink: 0;
-  box-shadow: 0 2px 10px rgba(168,120,42,0.35),
-              inset 0 1px 0 rgba(255,248,220,0.25);
+  box-shadow: 0 2px 10px rgba(168,120,42,0.35), inset 0 1px 0 rgba(255,248,220,0.25);
   position: relative; overflow: hidden;
 }
-.logo-seal::after {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(145deg, rgba(255,248,220,0.2) 0%, transparent 55%);
-}
+.logo-seal::after { content:''; position:absolute; inset:0; background:linear-gradient(145deg,rgba(255,248,220,0.2) 0%,transparent 55%); }
+.logo-name { font-family:'Cormorant Garamond',serif; font-size:25px; font-weight:700; letter-spacing:0.4px; color:var(--ink-1); }
+.logo-name em { font-style:italic; color:var(--gold); }
+.logo-pipe { width:1px; height:22px; background:var(--line2); margin:0 2px; }
+.logo-tag { font-size:10px; font-weight:600; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-3); }
+.hdr-right { display:flex; align-items:center; gap:16px; }
+.live-badge { display:flex; align-items:center; gap:7px; padding:5px 13px; background:var(--green-sub); border:1px solid var(--green-ln); border-radius:999px; }
+.live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 0 2px rgba(45,122,80,0.2); animation:pulse 2.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 2px rgba(45,122,80,0.2)} 50%{box-shadow:0 0 0 5px rgba(45,122,80,0.06)} }
+.live-lbl { font-size:11px; font-weight:600; color:var(--green); }
+.hdr-ts { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-3); }
 
-.logo-name {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 25px; font-weight: 700;
-  letter-spacing: 0.4px; color: var(--ink-1);
-}
-.logo-name em { font-style: italic; color: var(--gold); }
-
-.logo-pipe { width: 1px; height: 22px; background: var(--line2); margin: 0 2px; }
-
-.logo-tag {
-  font-size: 10px; font-weight: 600;
-  letter-spacing: 2.5px; text-transform: uppercase; color: var(--ink-3);
-}
-
-.hdr-right { display: flex; align-items: center; gap: 16px; }
-
-.live-badge {
-  display: flex; align-items: center; gap: 7px;
-  padding: 5px 13px;
-  background: var(--green-sub);
-  border: 1px solid var(--green-ln);
-  border-radius: 999px;
-}
-.live-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 0 2px rgba(45,122,80,0.2);
-  animation: pulse 2.5s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%,100% { box-shadow: 0 0 0 2px rgba(45,122,80,0.2); }
-  50%     { box-shadow: 0 0 0 5px rgba(45,122,80,0.06); }
-}
-.live-lbl { font-size: 11px; font-weight: 600; color: var(--green); }
-
-.hdr-ts {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; color: var(--ink-3);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   HERO
-═══════════════════════════════════════════════════════════════════════ */
+/* ── HERO ─────────────────────────────────────────────── */
 .hero {
-  padding: 64px 44px 52px;
+  padding: 64px 44px 52px; border-bottom: 1px solid var(--line);
+  background: var(--parch-1); position: relative; overflow: hidden;
+}
+.hero-wm { position:absolute; right:60px; top:30px; font-size:180px; line-height:1; color:var(--gold3); opacity:0.08; font-family:'Cormorant Garamond',serif; user-select:none; pointer-events:none; font-weight:700; }
+.hero::before { content:''; position:absolute; top:0; left:0; width:200px; height:2px; background:linear-gradient(90deg,var(--gold2),transparent); }
+.hero-kicker { display:flex; align-items:center; gap:10px; font-size:10.5px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:20px; opacity:0; animation:up 0.6s 0.1s ease forwards; }
+.hero-kicker-rule { width:24px; height:1.5px; background:var(--gold2); }
+.hero h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(42px,5.5vw,70px); font-weight:600; line-height:1.03; letter-spacing:-1.5px; color:var(--ink-1); opacity:0; animation:up 0.7s 0.2s ease forwards; }
+.hero h1 em { font-style:italic; color:var(--gold); }
+.hero-ornament { display:flex; align-items:center; gap:10px; margin:22px 0; opacity:0; animation:up 0.6s 0.32s ease forwards; }
+.hero-ornament-line { flex:0 0 44px; height:1px; background:var(--gold3); }
+.hero-ornament-diamond { width:6px; height:6px; background:var(--gold2); transform:rotate(45deg); }
+.hero-sub { color:var(--ink-2); font-size:15px; line-height:1.8; max-width:560px; opacity:0; animation:up 0.7s 0.38s ease forwards; }
+@keyframes up { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── STATS ────────────────────────────────────────────── */
+.stats-row { display:grid; grid-template-columns:repeat(5,1fr); background:var(--card); border-bottom:1px solid var(--line); }
+.stat-card { padding:28px 30px; border-right:1px solid var(--line); position:relative; overflow:hidden; transition:background 0.22s; opacity:0; animation:up 0.55s ease forwards; }
+.stat-card:last-child { border-right:none; }
+.stat-card:hover { background:var(--parch-0); }
+.stat-card:hover .stat-bar { transform:scaleX(1); }
+.stat-bar { position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--gold),var(--gold3),transparent); transform:scaleX(0); transform-origin:left; transition:transform 0.35s ease; }
+.stat-card:nth-child(1){animation-delay:.35s} .stat-card:nth-child(2){animation-delay:.45s} .stat-card:nth-child(3){animation-delay:.55s} .stat-card:nth-child(4){animation-delay:.65s} .stat-card:nth-child(5){animation-delay:.75s}
+.stat-lbl { font-size:9.5px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-3); }
+.stat-val { font-family:'Cormorant Garamond',serif; font-size:46px; font-weight:600; line-height:1.05; color:var(--gold); margin-top:4px; }
+.stat-note { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--green); margin-top:4px; }
+.stat-note.dim { color:var(--ink-3); }
+
+/* ── DATA BANNER ──────────────────────────────────────── */
+.data-banner { display:none; align-items:center; gap:10px; padding:9px 44px; font-family:'JetBrains Mono',monospace; font-size:11.5px; border-bottom:1px solid var(--line); }
+.data-banner.ok   { background:var(--green-sub); color:var(--green); border-color:var(--green-ln); }
+.data-banner.warn { background:var(--gold-sub);  color:var(--gold);  border-color:rgba(168,120,42,0.2); }
+.data-banner.err  { background:var(--red-sub); color:var(--red); border-color:var(--red-ln); }
+
+/* ── TABS ─────────────────────────────────────────────── */
+.main-tabs {
+  display: flex; align-items: center; gap: 0;
   border-bottom: 1px solid var(--line);
-  background: var(--parch-1);
-  position: relative; overflow: hidden;
+  background: var(--card); padding: 0 44px;
 }
+.tab-btn {
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 500;
+  padding: 14px 22px; border: none; background: transparent;
+  color: var(--ink-3); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.18s; display: flex; align-items: center; gap: 8px;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--ink-1); }
+.tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 600; }
+.tab-badge {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  background: var(--gold-sub); color: var(--gold);
+  border: 1px solid rgba(168,120,42,0.2);
+  border-radius: 999px; padding: 1px 7px; font-weight: 600;
+}
+.tab-badge.new { background: var(--green-sub); color: var(--green); border-color: var(--green-ln); }
 
-/* Decorative gold watermark — scales symbol */
-.hero-wm {
-  position: absolute; right: 60px; top: 30px;
-  font-size: 180px; line-height: 1;
-  color: var(--gold3); opacity: 0.08;
-  font-family: 'Cormorant Garamond', serif;
-  user-select: none; pointer-events: none;
-  font-weight: 700;
-}
+/* ── CONTENT GRID ─────────────────────────────────────── */
+.content-grid { display:grid; grid-template-columns:1fr 340px; min-height:calc(100vh - 280px); align-items:start; }
 
-/* Top gold rule */
-.hero::before {
-  content: '';
-  position: absolute; top: 0; left: 0; width: 200px; height: 2px;
-  background: linear-gradient(90deg, var(--gold2), transparent);
-}
+/* ── TAB PANELS ───────────────────────────────────────── */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
-.hero-kicker {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 10.5px; font-weight: 700;
-  letter-spacing: 3px; text-transform: uppercase; color: var(--gold);
-  margin-bottom: 20px;
-  opacity: 0; animation: up 0.6s 0.1s ease forwards;
-}
-.hero-kicker-rule { width: 24px; height: 1.5px; background: var(--gold2); }
-
-.hero h1 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(42px, 5.5vw, 70px);
-  font-weight: 600; line-height: 1.03;
-  letter-spacing: -1.5px; color: var(--ink-1);
-  opacity: 0; animation: up 0.7s 0.2s ease forwards;
-}
-.hero h1 em { font-style: italic; color: var(--gold); }
-
-.hero-ornament {
-  display: flex; align-items: center; gap: 10px;
-  margin: 22px 0;
-  opacity: 0; animation: up 0.6s 0.32s ease forwards;
-}
-.hero-ornament-line { flex: 0 0 44px; height: 1px; background: var(--gold3); }
-.hero-ornament-diamond {
-  width: 6px; height: 6px;
-  background: var(--gold2);
-  transform: rotate(45deg);
-}
-
-.hero-sub {
-  color: var(--ink-2); font-size: 15px; line-height: 1.8;
-  max-width: 520px;
-  opacity: 0; animation: up 0.7s 0.38s ease forwards;
-}
-
-@keyframes up {
-  from { opacity:0; transform: translateY(14px); }
-  to   { opacity:1; transform: translateY(0); }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   STATS ROW
-═══════════════════════════════════════════════════════════════════════ */
-.stats-row {
-  display: grid; grid-template-columns: repeat(5,1fr);
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-}
-
-.stat-card {
-  padding: 28px 30px;
-  border-right: 1px solid var(--line);
-  position: relative; overflow: hidden;
-  transition: background 0.22s;
-  opacity: 0; animation: up 0.55s ease forwards;
-}
-.stat-card:last-child { border-right: none; }
-.stat-card:hover { background: var(--parch-0); }
-.stat-card:hover .stat-bar { transform: scaleX(1); }
-
-.stat-bar {
-  position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--gold), var(--gold3), transparent);
-  transform: scaleX(0); transform-origin: left;
-  transition: transform 0.35s ease;
-}
-
-.stat-card:nth-child(1) { animation-delay:.35s }
-.stat-card:nth-child(2) { animation-delay:.45s }
-.stat-card:nth-child(3) { animation-delay:.55s }
-.stat-card:nth-child(4) { animation-delay:.65s }
-.stat-card:nth-child(5) { animation-delay:.75s }
-
-.stat-lbl {
-  font-size: 9.5px; font-weight: 700;
-  letter-spacing: 2.5px; text-transform: uppercase; color: var(--ink-3);
-}
-.stat-val {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 46px; font-weight: 600; line-height: 1.05;
-  color: var(--gold); margin-top: 4px;
-}
-.stat-note {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; color: var(--green); margin-top: 4px;
-}
-.stat-note.dim { color: var(--ink-3); }
-
-/* ═══════════════════════════════════════════════════════════════════════
-   DATA BANNER
-═══════════════════════════════════════════════════════════════════════ */
-.data-banner {
-  display: none; align-items: center; gap: 10px;
-  padding: 9px 44px;
-  font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
-  border-bottom: 1px solid var(--line);
-}
-.data-banner.ok   { background: var(--green-sub); color: var(--green); border-color: var(--green-ln); }
-.data-banner.warn { background: var(--gold-sub);  color: var(--gold);  border-color: rgba(168,120,42,0.2); }
-.data-banner.err  { background: rgba(176,48,48,0.05); color: var(--red); border-color: rgba(176,48,48,0.2); }
-
-/* ═══════════════════════════════════════════════════════════════════════
-   CONTENT GRID
-═══════════════════════════════════════════════════════════════════════ */
-.content-grid {
-  display: grid; grid-template-columns: 1fr 340px;
-  min-height: calc(100vh - 260px);
-  align-items: start;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   JOBS PANEL
-═══════════════════════════════════════════════════════════════════════ */
+/* ── JOBS PANEL (shared) ──────────────────────────────── */
 .jobs-panel { border-right: 1px solid var(--line); }
-
 .panel-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 32px; background:rgba(251,247,240,0.95);
+  backdrop-filter:blur(16px); border-bottom:1px solid var(--line);
+  position:sticky; top:68px; z-index:50; gap:16px;
+}
+.panel-title { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:600; color:var(--ink-1); flex-shrink:0; }
+.panel-ct { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-3); margin-left:6px; }
+.filter-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.srch-wrap { position:relative; }
+.srch-ico { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--ink-3); font-size:14px; pointer-events:none; }
+.srch-box { font-family:'JetBrains Mono',monospace; font-size:12px; padding:7px 14px 7px 32px; background:var(--card); border:1px solid var(--line); border-radius:8px; color:var(--ink-1); outline:none; width:210px; transition:border-color 0.2s,box-shadow 0.2s; box-shadow:var(--sh-sm); }
+.srch-box::placeholder { color:var(--ink-4); }
+.srch-box:focus { border-color:var(--gold2); box-shadow:0 0 0 3px var(--gold-glow); }
+.filt-btn { font-family:'Outfit',sans-serif; font-size:12px; font-weight:500; padding:5px 15px; border:1px solid var(--line); border-radius:999px; background:var(--card); color:var(--ink-2); cursor:pointer; transition:all 0.18s; box-shadow:var(--sh-sm); }
+.filt-btn:hover { border-color:var(--gold2); color:var(--gold); }
+.filt-btn.active { background:linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%); border-color:transparent; color:#FFF8E8; font-weight:600; box-shadow:0 2px 10px rgba(168,120,42,0.28); }
+
+/* ── JOB CARDS ────────────────────────────────────────── */
+.job-card { display:flex; align-items:stretch; background:var(--card); border-bottom:1px solid var(--line); transition:background 0.18s; position:relative; }
+.job-card:hover { background:var(--parch-0); }
+.job-card:hover .jstripe { background:var(--gold2); opacity:1; }
+.job-card.student:hover .jstripe { background:var(--blue); opacity:1; }
+.job-card:hover .japply { opacity:1; transform:translateX(0); }
+.job-card.gmail-card .jstripe { background: rgba(234,67,53,0.3); }
+.job-card.gmail-card:hover .jstripe { background: #EA4335; opacity: 1; }
+.jstripe { width:3px; flex-shrink:0; background:var(--line2); opacity:0.6; transition:background 0.18s,opacity 0.18s; }
+.job-card.student .jstripe { background:var(--blue-ln); }
+.jinner { display:flex; align-items:center; justify-content:space-between; padding:20px 28px; flex:1; gap:20px; }
+.jmain { flex:1; min-width:0; }
+.jtitle { font-family:'Cormorant Garamond',serif; font-size:18.5px; font-weight:600; color:var(--ink-1); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color 0.18s; }
+.job-card:hover .jtitle { color:var(--gold); }
+.jfirm { font-size:12.5px; color:var(--ink-2); margin-top:3px; display:flex; align-items:center; gap:6px; }
+.jdot { color:var(--ink-4); }
+.jmeta { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.badge { font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; padding:3px 9px; border-radius:4px; border:1px solid transparent; }
+.b-assoc { background:var(--gold-sub); border-color:rgba(168,120,42,0.2); color:var(--gold); }
+.b-student { background:var(--blue-sub); border-color:var(--blue-ln); color:var(--blue); }
+.b-score { background:var(--green-sub); border-color:var(--green-ln); color:var(--green); font-family:'JetBrains Mono',monospace; }
+.b-src { background:var(--parch-2); border-color:var(--line); color:var(--ink-3); font-family:'JetBrains Mono',monospace; }
+.b-gmail { background:rgba(234,67,53,0.07); border-color:rgba(234,67,53,0.2); color:#C0392B; }
+.b-loc { background:var(--green-sub); border-color:var(--green-ln); color:var(--green); }
+.jactions { display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0; }
+.japply { font-family:'Outfit',sans-serif; font-size:12.5px; font-weight:600; padding:8px 20px; background:linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%); color:#FFF8E8; border:none; border-radius:7px; cursor:pointer; text-decoration:none; white-space:nowrap; box-shadow:0 2px 8px rgba(168,120,42,0.25); transition:all 0.18s; opacity:0.85; transform:translateX(5px); }
+.japply:hover { background:linear-gradient(135deg,var(--gold2) 0%,var(--gold3) 100%); box-shadow:0 4px 14px rgba(168,120,42,0.35); opacity:1; transform:translateX(0); }
+
+/* ── EMPTY / SPINNER ──────────────────────────────────── */
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 40px; text-align:center; background:var(--card); }
+.empty-icon { font-size:44px; margin-bottom:20px; opacity:0.25; }
+.empty-title { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; color:var(--ink-2); }
+.empty-sub { font-size:13px; margin-top:10px; line-height:1.85; max-width:440px; color:var(--ink-2); }
+.spinner { width:30px; height:30px; border:2px solid var(--line); border-top-color:var(--gold); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 24px; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ── GMAIL PANEL ──────────────────────────────────────── */
+.gmail-scan-bar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 32px;
-  background: rgba(251,247,240,0.95);
-  backdrop-filter: blur(16px);
+  background: var(--card);
   border-bottom: 1px solid var(--line);
   position: sticky; top: 68px; z-index: 50; gap: 16px;
+  flex-wrap: wrap;
 }
+.gmail-info {
+  display: flex; align-items: center; gap: 12px;
+}
+.gmail-logo {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px;
+  background: rgba(234,67,53,0.08); border: 1px solid rgba(234,67,53,0.18);
+  font-size: 16px;
+}
+.gmail-label { font-size: 13px; color: var(--ink-2); }
+.gmail-label strong { color: var(--ink-1); font-weight: 600; }
 
-.panel-title {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 19px; font-weight: 600; color: var(--ink-1); flex-shrink: 0;
-}
-.panel-ct {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; color: var(--ink-3); margin-left: 6px;
-}
-
-.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
-.srch-wrap { position: relative; }
-.srch-ico {
-  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
-  color: var(--ink-3); font-size: 14px; pointer-events: none;
-}
-.srch-box {
+.gmail-controls { display: flex; align-items: center; gap: 10px; }
+.gmail-days-label { font-size: 12px; color: var(--ink-3); }
+.days-select {
   font-family: 'JetBrains Mono', monospace; font-size: 12px;
-  padding: 7px 14px 7px 32px;
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: 8px; color: var(--ink-1); outline: none; width: 210px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: var(--sh-sm);
+  padding: 6px 10px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 7px; color: var(--ink-1); cursor: pointer; outline: none;
 }
-.srch-box::placeholder { color: var(--ink-4); }
-.srch-box:focus {
-  border-color: var(--gold2);
-  box-shadow: 0 0 0 3px var(--gold-glow);
-}
+.days-select:focus { border-color: var(--gold2); box-shadow: 0 0 0 3px var(--gold-glow); }
 
-.filt-btn {
-  font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 500;
-  padding: 5px 15px; border: 1px solid var(--line);
-  border-radius: 999px; background: var(--card);
-  color: var(--ink-2); cursor: pointer; transition: all 0.18s;
-  box-shadow: var(--sh-sm);
-}
-.filt-btn:hover { border-color: var(--gold2); color: var(--gold); }
-.filt-btn.active {
+.btn-scan {
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 9px 24px;
   background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
-  border-color: transparent; color: #FFF8E8; font-weight: 600;
-  box-shadow: 0 2px 10px rgba(168,120,42,0.28);
+  color: #FFF8E8; border: none; border-radius: 8px;
+  cursor: pointer; transition: all 0.18s; white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(168,120,42,0.25);
+  display: flex; align-items: center; gap: 8px;
 }
+.btn-scan:hover { box-shadow: 0 4px 16px rgba(168,120,42,0.35); transform: translateY(-1px); }
+.btn-scan:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   JOB CARDS
-═══════════════════════════════════════════════════════════════════════ */
-.job-card {
-  display: flex; align-items: stretch;
-  background: var(--card);
+.gmail-criteria {
+  padding: 12px 32px;
+  background: var(--parch-1);
   border-bottom: 1px solid var(--line);
-  transition: background 0.18s;
-  position: relative;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
-.job-card:hover { background: var(--parch-0); }
-.job-card:hover .jstripe { background: var(--gold2); opacity: 1; }
-.job-card.student:hover .jstripe { background: var(--blue); opacity: 1; }
-.job-card:hover .japply { opacity: 1; transform: translateX(0); }
+.criteria-label { font-size: 10.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }
+.criteria-tag {
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px;
+  display: flex; align-items: center; gap: 5px;
+}
+.ct-loc  { background: var(--green-sub); color: var(--green); border: 1px solid var(--green-ln); }
+.ct-exp  { background: var(--gold-sub);  color: var(--gold);  border: 1px solid rgba(168,120,42,0.2); }
+.ct-role { background: var(--blue-sub);  color: var(--blue);  border: 1px solid var(--blue-ln); }
 
-.jstripe {
-  width: 3px; flex-shrink: 0;
-  background: var(--line2); opacity: 0.6;
-  transition: background 0.18s, opacity 0.18s;
+/* Gmail scanning progress */
+.gmail-progress {
+  padding: 32px; display: none; flex-direction: column; align-items: center;
+  gap: 16px; background: var(--card);
 }
-.job-card.student .jstripe { background: var(--blue-ln); }
+.gmail-progress.active { display: flex; }
+.progress-icon { font-size: 36px; animation: scanPulse 1.5s ease-in-out infinite; }
+@keyframes scanPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.1);opacity:0.7} }
+.progress-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--ink-1); }
+.progress-step { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3); }
+.progress-bar-wrap { width: 240px; height: 3px; background: var(--line); border-radius: 999px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold3)); border-radius: 999px; width: 0%; transition: width 0.4s ease; }
 
-.jinner {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 28px; flex: 1; gap: 20px;
-}
-.jmain { flex:1; min-width:0; }
-
-.jtitle {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 18.5px; font-weight: 600;
-  color: var(--ink-1); line-height: 1.3;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  transition: color 0.18s;
-}
-.job-card:hover .jtitle { color: var(--gold); }
-
-.jfirm {
-  font-size: 12.5px; color: var(--ink-2); margin-top: 3px;
-  display: flex; align-items: center; gap: 6px;
-}
-.jdot { color: var(--ink-4); }
-
-.jmeta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-
-.badge {
-  font-size: 9.5px; font-weight: 700;
-  letter-spacing: 1.2px; text-transform: uppercase;
-  padding: 3px 9px; border-radius: 4px; border: 1px solid transparent;
-}
-.b-assoc {
-  background: var(--gold-sub);
-  border-color: rgba(168,120,42,0.2); color: var(--gold);
-}
-.b-student {
-  background: var(--blue-sub);
-  border-color: var(--blue-ln); color: var(--blue);
-}
-.b-score {
+/* Gmail results summary */
+.gmail-summary {
+  display: none; padding: 14px 32px;
   background: var(--green-sub);
-  border-color: var(--green-ln); color: var(--green);
-  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid var(--green-ln);
+  font-size: 13px; color: var(--green); font-weight: 500;
+  align-items: center; gap: 10px;
 }
-.b-src {
-  background: var(--parch-2);
-  border-color: var(--line); color: var(--ink-3);
-  font-family: 'JetBrains Mono', monospace;
-}
+.gmail-summary.active { display: flex; }
+.gmail-summary.warn { background: var(--gold-sub); color: var(--gold); border-color: rgba(168,120,42,0.2); }
+.gmail-summary.err  { background: var(--red-sub);   color: var(--red);   border-color: var(--red-ln); }
 
-.jactions {
-  display: flex; flex-direction: column;
-  align-items: flex-end; gap: 8px; flex-shrink: 0;
-}
-.japply {
-  font-family: 'Outfit', sans-serif; font-size: 12.5px; font-weight: 600;
-  padding: 8px 20px;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
-  color: #FFF8E8; border: none; border-radius: 7px;
-  cursor: pointer; text-decoration: none; white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(168,120,42,0.25);
-  transition: all 0.18s;
-  opacity: 0.85; transform: translateX(5px);
-}
-.japply:hover {
-  background: linear-gradient(135deg, var(--gold2) 0%, var(--gold3) 100%);
-  box-shadow: 0 4px 14px rgba(168,120,42,0.35);
-  opacity: 1; transform: translateX(0);
-}
+/* ── PAGINATION ───────────────────────────────────────── */
+.pagination { display:flex; align-items:center; justify-content:center; gap:6px; padding:24px; border-top:1px solid var(--line); background:var(--card); }
+.page-btn { font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 13px; background:var(--card); border:1px solid var(--line); border-radius:6px; color:var(--ink-2); cursor:pointer; transition:all 0.15s; box-shadow:var(--sh-sm); }
+.page-btn:hover { border-color:var(--gold2); color:var(--gold); }
+.page-btn.active { background:linear-gradient(135deg,var(--gold),var(--gold2)); border-color:transparent; color:#FFF8E8; font-weight:600; }
+.page-btn:disabled { opacity:0.3; cursor:default; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   EMPTY / SPINNER
-═══════════════════════════════════════════════════════════════════════ */
-.empty-state {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 80px 40px; text-align: center;
-  background: var(--card);
-}
-.empty-icon { font-size: 44px; margin-bottom: 20px; opacity: 0.25; }
-.empty-title {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 22px; font-weight: 600; color: var(--ink-2);
-}
-.empty-sub { font-size: 13px; margin-top: 10px; line-height: 1.85; max-width: 440px; color: var(--ink-2); }
-
-.spinner {
-  width: 30px; height: 30px;
-  border: 2px solid var(--line);
-  border-top-color: var(--gold);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  margin: 0 auto 24px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ═══════════════════════════════════════════════════════════════════════
-   PAGINATION
-═══════════════════════════════════════════════════════════════════════ */
-.pagination {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 24px; border-top: 1px solid var(--line);
-  background: var(--card);
-}
-.page-btn {
-  font-family: 'JetBrains Mono', monospace; font-size: 12px;
-  padding: 6px 13px; background: var(--card); border: 1px solid var(--line);
-  border-radius: 6px; color: var(--ink-2); cursor: pointer;
-  transition: all 0.15s; box-shadow: var(--sh-sm);
-}
-.page-btn:hover { border-color: var(--gold2); color: var(--gold); }
-.page-btn.active {
-  background: linear-gradient(135deg, var(--gold), var(--gold2));
-  border-color: transparent; color: #FFF8E8; font-weight: 600;
-}
-.page-btn:disabled { opacity: 0.3; cursor: default; }
-
-/* ═══════════════════════════════════════════════════════════════════════
-   SIDEBAR
-═══════════════════════════════════════════════════════════════════════ */
-.sidebar { background: var(--parch-1); }
-
-.sb-block { padding: 28px 24px; border-bottom: 1px solid var(--line); }
-
-.sb-lbl {
-  font-size: 9.5px; font-weight: 700;
-  letter-spacing: 2.5px; text-transform: uppercase; color: var(--ink-3);
-  margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
-}
-.sb-lbl::after { content:''; flex:1; height:1px; background: var(--line); }
-
-/* Model card */
-.model-card {
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: 10px; padding: 18px;
-  box-shadow: var(--sh-sm); position: relative; overflow: hidden;
-}
-.model-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--gold), var(--gold3), transparent);
-}
-.mc-status { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-.mc-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 0 3px var(--green-sub);
-  animation: pulse 2.5s ease-in-out infinite;
-}
-.mc-lbl { font-size: 12px; font-weight: 600; color: var(--green); }
-
-.mc-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px;
-}
-.mc-row:last-child { border-bottom: none; }
-.mc-k { color: var(--ink-2); }
+/* ── SIDEBAR ──────────────────────────────────────────── */
+.sidebar { background:var(--parch-1); }
+.sb-block { padding:28px 24px; border-bottom:1px solid var(--line); }
+.sb-lbl { font-size:9.5px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-3); margin-bottom:18px; display:flex; align-items:center; gap:8px; }
+.sb-lbl::after { content:''; flex:1; height:1px; background:var(--line); }
+.model-card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; box-shadow:var(--sh-sm); position:relative; overflow:hidden; }
+.model-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--gold),var(--gold3),transparent); }
+.mc-status { display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+.mc-dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px var(--green-sub); animation:pulse 2.5s ease-in-out infinite; }
+.mc-lbl { font-size:12px; font-weight:600; color:var(--green); }
+.mc-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+.mc-row:last-child { border-bottom:none; }
+.mc-k { color:var(--ink-2); }
 .mc-v { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--ink-1); font-weight:500; }
-
-/* Run chart */
-.run-chart {
-  display: flex; align-items: flex-end; gap: 3px;
-  height: 56px; margin-top: 4px;
-}
-.rbar {
-  flex: 1; min-height: 3px;
-  background: var(--gold-sub);
-  border: 1px solid rgba(168,120,42,0.1);
-  border-bottom: none;
-  border-radius: 2px 2px 0 0;
-  transition: background 0.2s;
-  cursor: pointer; position: relative;
-}
-.rbar:hover { background: var(--gold3); }
-.rbar-tip {
-  display: none;
-  position: absolute; bottom: calc(100% + 8px); left: 50%;
-  transform: translateX(-50%);
-  background: var(--ink-1); color: var(--gold4);
-  border-radius: 6px; padding: 5px 10px;
-  font-size: 11px; white-space: nowrap; z-index: 10;
-  font-family: 'JetBrains Mono', monospace;
-  box-shadow: var(--sh-md);
-}
-.rbar:hover .rbar-tip { display: block; }
-
-/* Top companies */
-.co-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px;
-}
-.co-row:last-child { border-bottom: none; }
-.co-name { color: var(--ink-1); }
-.co-bar-wrap { display: flex; align-items: center; gap: 8px; }
-.co-bar {
-  height: 3px; border-radius: 999px;
-  background: linear-gradient(90deg, var(--gold), var(--gold3));
-  min-width: 4px;
-}
+.run-chart { display:flex; align-items:flex-end; gap:3px; height:56px; margin-top:4px; }
+.rbar { flex:1; min-height:3px; background:var(--gold-sub); border:1px solid rgba(168,120,42,0.1); border-bottom:none; border-radius:2px 2px 0 0; transition:background 0.2s; cursor:pointer; position:relative; }
+.rbar:hover { background:var(--gold3); }
+.rbar-tip { display:none; position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:var(--ink-1); color:var(--gold4); border-radius:6px; padding:5px 10px; font-size:11px; white-space:nowrap; z-index:10; font-family:'JetBrains Mono',monospace; box-shadow:var(--sh-md); }
+.rbar:hover .rbar-tip { display:block; }
+.co-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+.co-row:last-child { border-bottom:none; }
+.co-name { color:var(--ink-1); }
+.co-bar-wrap { display:flex; align-items:center; gap:8px; }
+.co-bar { height:3px; border-radius:999px; background:linear-gradient(90deg,var(--gold),var(--gold3)); min-width:4px; }
 .co-ct { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); min-width:18px; text-align:right; font-weight:500; }
+.src-note { font-size:12.5px; color:var(--ink-2); line-height:1.8; }
+.ctag { font-family:'JetBrains Mono',monospace; background:var(--gold-sub); border:1px solid rgba(168,120,42,0.15); border-radius:4px; padding:1px 7px; color:var(--gold); font-size:11px; }
+.url-box { margin-top:14px; background:var(--parch-3); border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--ink-2); word-break:break-all; cursor:pointer; transition:border-color 0.2s,background 0.2s; }
+.url-box:hover { border-color:var(--gold2); background:var(--card); }
+.url-hint { font-size:10px; color:var(--ink-3); margin-top:5px; text-align:right; font-family:'JetBrains Mono',monospace; }
 
-/* Data source */
-.src-note { font-size: 12.5px; color: var(--ink-2); line-height: 1.8; }
-.ctag {
-  font-family: 'JetBrains Mono', monospace;
-  background: var(--gold-sub); border: 1px solid rgba(168,120,42,0.15);
-  border-radius: 4px; padding: 1px 7px;
-  color: var(--gold); font-size: 11px;
-}
-.url-box {
-  margin-top: 14px; background: var(--parch-3); border: 1px solid var(--line);
-  border-radius: 8px; padding: 12px 14px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-2);
-  word-break: break-all; cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-.url-box:hover { border-color: var(--gold2); background: var(--card); }
-.url-hint { font-size: 10px; color: var(--ink-3); margin-top: 5px; text-align: right; font-family:'JetBrains Mono',monospace; }
+/* Gmail sidebar stats */
+.gmail-stat-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+.gmail-stat-row:last-child { border-bottom:none; }
+.gs-k { color:var(--ink-2); }
+.gs-v { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--ink-1); font-weight:500; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   TOAST
-═══════════════════════════════════════════════════════════════════════ */
-.toast {
-  position: fixed; bottom: 28px; right: 28px; z-index: 999; display: none;
-  background: var(--ink-1); color: var(--gold4);
-  border-radius: 10px; padding: 12px 22px;
-  font-size: 13px; font-weight: 500;
-  animation: toastIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
-  box-shadow: var(--sh-md);
-}
-@keyframes toastIn {
-  from { transform: translateY(16px) scale(0.95); opacity: 0; }
-  to   { transform: translateY(0) scale(1); opacity: 1; }
-}
+/* ── TOAST ────────────────────────────────────────────── */
+.toast { position:fixed; bottom:28px; right:28px; z-index:999; display:none; background:var(--ink-1); color:var(--gold4); border-radius:10px; padding:12px 22px; font-size:13px; font-weight:500; animation:toastIn 0.3s cubic-bezier(0.34,1.56,0.64,1); box-shadow:var(--sh-md); }
+@keyframes toastIn { from{transform:translateY(16px) scale(0.95);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   RESPONSIVE
-═══════════════════════════════════════════════════════════════════════ */
-@media (max-width: 1000px) {
-  .content-grid { grid-template-columns: 1fr; }
-  .sidebar { border-top: 1px solid var(--line); }
-  .stats-row { grid-template-columns: repeat(3,1fr); }
-}
-@media (max-width: 700px) {
-  header { padding: 0 20px; }
-  .hero  { padding: 40px 20px 32px; }
-  .panel-hdr { padding: 14px 20px; top: 68px; }
-  .jinner { padding: 16px 20px; }
-  .filter-row { display: none; }
-  .srch-box { width: 160px; }
-  .stats-row { grid-template-columns: repeat(2,1fr); }
-  .logo-pipe, .logo-tag { display: none; }
-  .hero-wm { display: none; }
-}
+/* ── RESPONSIVE ───────────────────────────────────────── */
+@media (max-width:1000px) { .content-grid{grid-template-columns:1fr} .sidebar{border-top:1px solid var(--line)} .stats-row{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:700px) { header{padding:0 20px} .hero{padding:40px 20px 32px} .panel-hdr,.gmail-scan-bar{padding:14px 20px; top:68px} .jinner{padding:16px 20px} .filter-row{display:none} .srch-box{width:160px} .stats-row{grid-template-columns:repeat(2,1fr)} .logo-pipe,.logo-tag,.hero-wm{display:none} .main-tabs{padding:0 20px} .gmail-criteria{padding:12px 20px} }
 </style>
 </head>
 <body>
@@ -634,10 +359,7 @@ header {
     <div class="logo-tag">Law Intelligence</div>
   </a>
   <div class="hdr-right">
-    <div class="live-badge">
-      <div class="live-dot"></div>
-      <span class="live-lbl">Live</span>
-    </div>
+    <div class="live-badge"><div class="live-dot"></div><span class="live-lbl">Live</span></div>
     <span class="hdr-ts" id="lastUpdated">—</span>
   </div>
 </header>
@@ -645,82 +367,130 @@ header {
 <!-- HERO -->
 <div class="hero">
   <div class="hero-wm">⚖</div>
-  <div class="hero-kicker">
-    <span class="hero-kicker-rule"></span>
-    Canadian Law Market
-  </div>
+  <div class="hero-kicker"><span class="hero-kicker-rule"></span>Canadian Law Market</div>
   <h1>Associate &amp; <em>Articling</em><br>Intelligence</h1>
   <div class="hero-ornament">
     <div class="hero-ornament-line"></div>
     <div class="hero-ornament-diamond"></div>
     <div class="hero-ornament-line" style="flex:0 0 24px"></div>
   </div>
-  <p class="hero-sub">50+ Canadian law firms scraped every 2 hours. Self-training AI model filters for Ontario &amp; Alberta. Every listing scored, ranked, and alerted via Telegram.</p>
+  <p class="hero-sub">50+ Canadian law firms scraped every 2 hours — plus your Gmail inbox. AI filters every source for Ontario &amp; Alberta associate roles with 0–2 years' experience.</p>
 </div>
 
 <!-- STATS -->
 <div class="stats-row">
-  <div class="stat-card"><div class="stat-bar"></div>
-    <div class="stat-lbl">All-Time Jobs</div>
-    <div class="stat-val" id="statTotal">—</div>
-    <div class="stat-note" id="statTotalDelta"></div>
-  </div>
-  <div class="stat-card"><div class="stat-bar"></div>
-    <div class="stat-lbl">Training Runs</div>
-    <div class="stat-val" id="statRuns">—</div>
-    <div class="stat-note">self-improves each run</div>
-  </div>
-  <div class="stat-card"><div class="stat-bar"></div>
-    <div class="stat-lbl">Score Threshold</div>
-    <div class="stat-val" id="statThreshold">—</div>
-    <div class="stat-note">adaptive</div>
-  </div>
-  <div class="stat-card"><div class="stat-bar"></div>
-    <div class="stat-lbl">Sites Monitored</div>
-    <div class="stat-val">50<span style="font-size:22px;color:var(--ink-3)">+</span></div>
-    <div class="stat-note dim">firms &amp; aggregators</div>
-  </div>
-  <div class="stat-card"><div class="stat-bar"></div>
-    <div class="stat-lbl">Alerts Via</div>
-    <div class="stat-val" style="font-size:36px">✈︎</div>
-    <div class="stat-note dim">Telegram · every 2 h</div>
-  </div>
+  <div class="stat-card"><div class="stat-bar"></div><div class="stat-lbl">All-Time Jobs</div><div class="stat-val" id="statTotal">—</div><div class="stat-note" id="statTotalDelta"></div></div>
+  <div class="stat-card"><div class="stat-bar"></div><div class="stat-lbl">Training Runs</div><div class="stat-val" id="statRuns">—</div><div class="stat-note">self-improves each run</div></div>
+  <div class="stat-card"><div class="stat-bar"></div><div class="stat-lbl">Score Threshold</div><div class="stat-val" id="statThreshold">—</div><div class="stat-note">adaptive</div></div>
+  <div class="stat-card"><div class="stat-bar"></div><div class="stat-lbl">Sites Monitored</div><div class="stat-val">50<span style="font-size:22px;color:var(--ink-3)">+</span></div><div class="stat-note dim">firms &amp; aggregators</div></div>
+  <div class="stat-card"><div class="stat-bar"></div><div class="stat-lbl">Gmail Hits</div><div class="stat-val" id="statGmail">—</div><div class="stat-note dim" id="statGmailSub">not yet scanned</div></div>
 </div>
 
-<!-- DATA BANNER -->
 <div class="data-banner" id="dataBanner"></div>
 
-<!-- CONTENT -->
+<!-- TABS -->
+<div class="main-tabs">
+  <button class="tab-btn active" data-tab="scraped" onclick="switchTab('scraped',this)">
+    🌐 Scraped Listings
+    <span class="tab-badge" id="tabBadgeScrape">—</span>
+  </button>
+  <button class="tab-btn" data-tab="gmail" onclick="switchTab('gmail',this)">
+    ✉ Gmail Scan
+    <span class="tab-badge new" id="tabBadgeGmail">New</span>
+  </button>
+</div>
+
+<!-- CONTENT GRID -->
 <div class="content-grid">
 
-  <!-- JOBS PANEL -->
-  <div class="jobs-panel">
-    <div class="panel-hdr">
-      <div style="display:flex;align-items:baseline;gap:4px">
-        <span class="panel-title">Verified Listings</span>
-        <span class="panel-ct" id="listingCount"></span>
-      </div>
-      <div class="filter-row">
-        <div class="srch-wrap">
-          <span class="srch-ico">⌕</span>
-          <input class="srch-box" id="searchInput" type="text" placeholder="Search title or firm…"/>
+  <!-- ═══ MAIN COLUMN ═══ -->
+  <div>
+
+    <!-- TAB: SCRAPED -->
+    <div class="tab-panel active" id="panel-scraped">
+      <div class="jobs-panel">
+        <div class="panel-hdr">
+          <div style="display:flex;align-items:baseline;gap:4px">
+            <span class="panel-title">Verified Listings</span>
+            <span class="panel-ct" id="listingCount"></span>
+          </div>
+          <div class="filter-row">
+            <div class="srch-wrap">
+              <span class="srch-ico">⌕</span>
+              <input class="srch-box" id="searchInput" type="text" placeholder="Search title or firm…"/>
+            </div>
+            <button class="filt-btn active" data-filter="all">All</button>
+            <button class="filt-btn" data-filter="Associate">Associate</button>
+            <button class="filt-btn" data-filter="Student">Articling</button>
+          </div>
         </div>
-        <button class="filt-btn active" data-filter="all">All</button>
-        <button class="filt-btn" data-filter="Associate">Associate</button>
-        <button class="filt-btn" data-filter="Student">Articling</button>
+        <div id="jobsList">
+          <div class="empty-state"><div class="spinner"></div><div class="empty-title">Connecting to live data…</div><div class="empty-sub">Fetching from GitHub repository</div></div>
+        </div>
+        <div class="pagination" id="pagination" style="display:none"></div>
       </div>
     </div>
 
-    <div id="jobsList">
-      <div class="empty-state">
-        <div class="spinner"></div>
-        <div class="empty-title">Connecting to live data…</div>
-        <div class="empty-sub">Fetching from GitHub repository</div>
-      </div>
-    </div>
+    <!-- TAB: GMAIL -->
+    <div class="tab-panel" id="panel-gmail">
 
-    <div class="pagination" id="pagination" style="display:none"></div>
-  </div>
+      <!-- Scan controls -->
+      <div class="gmail-scan-bar">
+        <div class="gmail-info">
+          <div class="gmail-logo">✉</div>
+          <div class="gmail-label">
+            <strong>Gmail Inbox Scanner</strong><br>
+            <span style="font-size:11.5px">Searches your inbox for law job emails &amp; filters them with AI</span>
+          </div>
+        </div>
+        <div class="gmail-controls">
+          <span class="gmail-days-label">Look back:</span>
+          <select class="days-select" id="daysSelect">
+            <option value="7">7 days</option>
+            <option value="14" selected>14 days</option>
+            <option value="30">30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+          </select>
+          <button class="btn-scan" id="btnScan" onclick="runGmailScan()">
+            <span id="scanBtnTxt">🔍 Scan Gmail</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Active filter criteria display -->
+      <div class="gmail-criteria">
+        <span class="criteria-label">Filters active</span>
+        <span class="criteria-tag ct-loc">📍 Ontario</span>
+        <span class="criteria-tag ct-loc">📍 Alberta</span>
+        <span class="criteria-tag ct-exp">⏱ 0–2 years experience</span>
+        <span class="criteria-tag ct-role">⚖ Associate / Articling</span>
+        <span class="criteria-tag ct-role">🚫 No senior roles</span>
+      </div>
+
+      <!-- Progress indicator -->
+      <div class="gmail-progress" id="gmailProgress">
+        <div class="progress-icon">✉</div>
+        <div class="progress-title">Scanning your inbox…</div>
+        <div class="progress-step" id="progressStep">Connecting to Gmail…</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBar"></div></div>
+      </div>
+
+      <!-- Results summary -->
+      <div class="gmail-summary" id="gmailSummary"></div>
+
+      <!-- Results list -->
+      <div id="gmailJobsList">
+        <div class="empty-state">
+          <div class="empty-icon">✉</div>
+          <div class="empty-title">No scan yet</div>
+          <div class="empty-sub">Click <strong>Scan Gmail</strong> to search your inbox for law job emails matching the criteria above.</div>
+        </div>
+      </div>
+
+    </div><!-- /panel-gmail -->
+
+  </div><!-- /main col -->
 
   <!-- SIDEBAR -->
   <div class="sidebar">
@@ -728,10 +498,7 @@ header {
     <div class="sb-block">
       <div class="sb-lbl">Model Status</div>
       <div class="model-card">
-        <div class="mc-status">
-          <div class="mc-dot"></div>
-          <span class="mc-lbl">Self-training active</span>
-        </div>
+        <div class="mc-status"><div class="mc-dot"></div><span class="mc-lbl">Self-training active</span></div>
         <div class="mc-row"><span class="mc-k">Training runs</span><span class="mc-v" id="mRuns">—</span></div>
         <div class="mc-row"><span class="mc-k">Score threshold</span><span class="mc-v" id="mThreshold">—</span></div>
         <div class="mc-row"><span class="mc-k">All-time jobs</span><span class="mc-v" id="mTotal">—</span></div>
@@ -741,10 +508,19 @@ header {
     </div>
 
     <div class="sb-block">
-      <div class="sb-lbl">Jobs per Run (last 30)</div>
-      <div class="run-chart" id="runChart">
-        <span style="color:var(--ink-3);font-size:11.5px">No run history yet</span>
+      <div class="sb-lbl">Gmail Scan Stats</div>
+      <div class="model-card">
+        <div class="mc-row"><span class="mc-k">Last scan</span><span class="mc-v" id="gsLastScan">—</span></div>
+        <div class="mc-row"><span class="mc-k">Emails read</span><span class="mc-v" id="gsEmailsRead">—</span></div>
+        <div class="mc-row"><span class="mc-k">Matched jobs</span><span class="mc-v" id="gsMatched">—</span></div>
+        <div class="mc-row"><span class="mc-k">Rejected (senior)</span><span class="mc-v" id="gsRejected">—</span></div>
+        <div class="mc-row"><span class="mc-k">Wrong location</span><span class="mc-v" id="gsWrongLoc">—</span></div>
       </div>
+    </div>
+
+    <div class="sb-block">
+      <div class="sb-lbl">Jobs per Run (last 30)</div>
+      <div class="run-chart" id="runChart"><span style="color:var(--ink-3);font-size:11.5px">No run history yet</span></div>
     </div>
 
     <div class="sb-block">
@@ -754,22 +530,21 @@ header {
 
     <div class="sb-block">
       <div class="sb-lbl">Data Source</div>
-      <p class="src-note">
-        Live data read from your GitHub repo.<br/>
-        Set <span class="ctag">GITHUB_USER</span> and
-        <span class="ctag">REPO_NAME</span> at the top of this file.
-      </p>
+      <p class="src-note">Live data from your GitHub repo.<br/>Set <span class="ctag">GITHUB_USER</span> and <span class="ctag">REPO_NAME</span> at the top of this file.</p>
       <div class="url-box" id="dataUrl" onclick="copyUrl()"></div>
       <div class="url-hint">click to copy ↑</div>
     </div>
 
-  </div>
-</div>
+  </div><!-- /sidebar -->
+</div><!-- /content-grid -->
 
 </div><!-- /shell -->
 <div class="toast" id="toast">✓ Copied to clipboard</div>
 
 <script>
+/* ─────────────────────────────────────────────────────────────────────
+   CONFIGURATION
+───────────────────────────────────────────────────────────────────── */
 const GITHUB_USER = "shaheersinn";
 const REPO_NAME   = "law-associate-job-alerts";
 const BRANCH      = "main";
@@ -777,12 +552,24 @@ const DATA_FILE   = "results.json";
 const RAW_URL     = `https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/${DATA_FILE}`;
 document.getElementById("dataUrl").textContent = RAW_URL;
 
+/* ── State ─────────────────────────────────────────────────────────── */
 let allJobs=[], filteredJobs=[], currentPage=1;
 const PAGE_SIZE=20;
 let activeFilter="all", searchQuery="";
+let gmailJobs=[];
+let gmailScanStats={ emailsRead:0, matched:0, rejected:0, wrongLoc:0, lastScan:null };
 
+/* ── Tab switching ──────────────────────────────────────────────────── */
+function switchTab(tab, btn) {
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("panel-"+tab).classList.add("active");
+}
+
+/* ── Animated counter ───────────────────────────────────────────────── */
 function animateCounter(el, target) {
-  const num = parseInt(String(target).replace(/\D/g,""))||0;
+  const num=parseInt(String(target).replace(/\D/g,""))||0;
   if(!num){el.textContent=target;return;}
   const t0=performance.now();
   (function step(now){
@@ -792,17 +579,18 @@ function animateCounter(el, target) {
   })(t0);
 }
 
+/* ── Fetch scraped data ─────────────────────────────────────────────── */
 async function fetchData() {
   const bn=document.getElementById("dataBanner");
   bn.style.display="flex"; bn.className="data-banner warn";
   bn.textContent="⟳  Fetching latest data from GitHub…";
   try {
     const r=await fetch(RAW_URL+"?t="+Date.now(),{cache:"no-store"});
-    if(!r.ok) throw new Error(`GitHub returned HTTP ${r.status}. Check results.json exists and the workflow has run at least once.`);
+    if(!r.ok) throw new Error(`GitHub returned HTTP ${r.status}`);
     const data=await r.json();
     if(!data.runs||!data.runs.length){
       bn.className="data-banner warn";
-      bn.textContent="⚠  results.json is empty — trigger a manual run: Actions → Law Associate Job Alerts → Run workflow";
+      bn.textContent="⚠  results.json is empty — trigger a manual run in GitHub Actions";
     } else {
       bn.className="data-banner ok";
       bn.textContent=`✓  Live — ${data.runs.length} run(s) · ${data.total_all_time??0} all-time jobs`;
@@ -816,9 +604,7 @@ async function fetchData() {
         <div class="empty-icon">⚠</div>
         <div class="empty-title">Could not load data</div>
         <div class="empty-sub">${escHtml(e.message)}<br/><br/>
-          <b>Most common fix:</b> Go to your GitHub repo → Actions →
-          Law Associate Job Alerts → Run workflow. After one successful run,
-          results.json will be committed and the dashboard will populate.
+          <b>Most common fix:</b> Go to your GitHub repo → Actions → Law Associate Job Alerts → Run workflow.
         </div>
       </div>`;
   }
@@ -846,6 +632,7 @@ function renderAll(data){
     document.getElementById("statTotalDelta").textContent=`+${n} this run`;
     document.getElementById("statTotalDelta").className=n>0?"stat-note":"stat-note dim";
   }
+  document.getElementById("tabBadgeScrape").textContent=allJobs.length||"0";
   renderRunChart(runs.slice(0,30).reverse());
   renderTopCompanies();
   applyFilterAndRender();
@@ -870,26 +657,7 @@ function renderPage(){
     list.innerHTML=`<div class="empty-state"><div class="empty-icon">⊘</div><div class="empty-title">No matching listings</div><div class="empty-sub">Try a different filter or search term.</div></div>`;
     document.getElementById("pagination").style.display="none"; return;
   }
-  list.innerHTML=page.map(job=>{
-    const cat=job.CATEGORY||"Unknown";
-    const cb=cat==="Associate"?`<span class="badge b-assoc">Associate</span>`:`<span class="badge b-student">Articling</span>`;
-    const sb=job.SCORE?`<span class="badge b-score">⚡ ${job.SCORE}</span>`:"";
-    const xb=job.SOURCE?`<span class="badge b-src">${escHtml(job.SOURCE)}</span>`:"";
-    const dt=job._run_ts?new Date(job._run_ts).toLocaleDateString("en-CA",{month:"short",day:"numeric"}):"";
-    return `<div class="job-card${cat==="Student"?" student":""}">
-      <div class="jstripe"></div>
-      <div class="jinner">
-        <div class="jmain">
-          <div class="jtitle">${escHtml(job.TITLE||"Untitled")}</div>
-          <div class="jfirm">${escHtml(job.COMPANY||"")}${dt?`<span class="jdot">·</span><span style="color:var(--ink-3)">${dt}</span>`:""}</div>
-          <div class="jmeta">${cb}${sb}${xb}</div>
-        </div>
-        <div class="jactions">
-          <a class="japply" href="${escHtml(job.URL||"#")}" target="_blank" rel="noopener">Apply →</a>
-        </div>
-      </div>
-    </div>`;
-  }).join("");
+  list.innerHTML=page.map(job=>renderJobCard(job, false)).join("");
   const pages=Math.ceil(total/PAGE_SIZE), pag=document.getElementById("pagination");
   if(pages<=1){pag.style.display="none";return;}
   pag.style.display="flex";
@@ -902,6 +670,36 @@ function renderPage(){
   pag.innerHTML=b;
 }
 
+function renderJobCard(job, isGmail=false) {
+  const cat=job.CATEGORY||"Unknown";
+  const cb=cat==="Associate"
+    ? `<span class="badge b-assoc">Associate</span>`
+    : `<span class="badge b-student">Articling</span>`;
+  const sb=job.SCORE?`<span class="badge b-score">⚡ ${job.SCORE}</span>`:"";
+  const xb=job.SOURCE?`<span class="badge b-src">${escHtml(job.SOURCE)}</span>`:"";
+  const lb=job.LOCATION?`<span class="badge b-loc">📍 ${escHtml(job.LOCATION)}</span>`:"";
+  const gb=isGmail?`<span class="badge b-gmail">✉ Gmail</span>`:"";
+  const dt=job._run_ts||job.DATE
+    ? new Date(job._run_ts||job.DATE).toLocaleDateString("en-CA",{month:"short",day:"numeric"}) : "";
+  const expb=job.EXP_YEARS?`<span class="badge b-score">${escHtml(job.EXP_YEARS)}</span>`:"";
+  const cc="job-card"+(cat==="Student"?" student":"")+(isGmail?" gmail-card":"");
+  const applyUrl=escHtml(job.URL||job.APPLY_URL||"#");
+  return `<div class="${cc}">
+    <div class="jstripe"></div>
+    <div class="jinner">
+      <div class="jmain">
+        <div class="jtitle">${escHtml(job.TITLE||"Untitled")}</div>
+        <div class="jfirm">${escHtml(job.COMPANY||"")}${dt?`<span class="jdot">·</span><span style="color:var(--ink-3)">${dt}</span>`:""}</div>
+        <div class="jmeta">${cb}${sb}${expb}${lb}${gb}${xb}</div>
+        ${job.SNIPPET?`<div style="font-size:12px;color:var(--ink-3);margin-top:8px;line-height:1.6;max-width:480px">${escHtml(job.SNIPPET)}</div>`:""}
+      </div>
+      <div class="jactions">
+        <a class="japply" href="${applyUrl}" target="_blank" rel="noopener">Apply →</a>
+      </div>
+    </div>
+  </div>`;
+}
+
 function goPage(n){
   const pages=Math.ceil(filteredJobs.length/PAGE_SIZE);
   if(n<1||n>pages) return;
@@ -909,6 +707,184 @@ function goPage(n){
   document.querySelector(".jobs-panel").scrollIntoView({behavior:"smooth"});
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   GMAIL SCAN — Claude API + Gmail MCP
+═══════════════════════════════════════════════════════════════════ */
+async function runGmailScan() {
+  const btn   = document.getElementById("btnScan");
+  const prog  = document.getElementById("gmailProgress");
+  const step  = document.getElementById("progressStep");
+  const bar   = document.getElementById("progressBar");
+  const sumEl = document.getElementById("gmailSummary");
+  const list  = document.getElementById("gmailJobsList");
+  const days  = document.getElementById("daysSelect").value;
+
+  btn.disabled=true;
+  document.getElementById("scanBtnTxt").textContent="Scanning…";
+  prog.classList.add("active");
+  sumEl.className="gmail-summary"; sumEl.textContent="";
+  list.innerHTML="";
+  bar.style.width="0%";
+
+  const setStep=(msg,pct)=>{ step.textContent=msg; bar.style.width=pct+"%"; };
+
+  setStep("Connecting to Gmail…", 10);
+
+  /* ── Build the prompt ─────────────────────────────────────────── */
+  const prompt = `You are a job-listing extractor. Your job is to search through Gmail emails and find law job postings that match strict criteria.
+
+STEP 1: Use the Gmail MCP tool to search for emails from the last ${days} days using these search queries (run them all):
+  - "subject:(associate lawyer OR articling student OR legal counsel OR law job OR legal position OR hiring lawyer)"
+  - "subject:(job opportunity) (lawyer OR legal OR counsel OR associate)"  
+  - "from:(ZSA OR heidrick OR recruiter OR careers OR noreply) (lawyer OR legal OR associate OR articling)"
+  - "associate lawyer Ontario OR Alberta"
+  - "articling student Ontario OR Alberta"
+  - "junior associate lawyer Canada"
+  - "newly called lawyer"
+
+STEP 2: For EACH email found, read its full content and extract job listings. Apply these STRICT filters — REJECT any job that fails any of these:
+
+ACCEPT ONLY:
+✅ Location: Ontario OR Alberta (Toronto, Ottawa, Mississauga, Brampton, Hamilton, London ON, Markham, Calgary, Edmonton, Red Deer, or explicit mention of ON/AB/Ontario/Alberta)
+✅ Role type: associate, lawyer, articling student, articling clerk, summer associate, legal counsel (junior/entry-level)
+✅ Experience: 0–2 years PQE / newly called / first year / second year / recent call to the bar / bar admission 2022–2025 / "junior associate"
+
+REJECT:
+❌ Location: British Columbia, Vancouver, Quebec, Montreal, Manitoba, USA, UK, or any non-ON/AB Canadian province
+❌ Senior roles: senior associate, partner, managing partner, general counsel, VP Legal, director, C-suite
+❌ Experience: 3+ years, mid-level, experienced, intermediate, senior
+❌ Non-legal: paralegal, legal assistant, law clerk (admin), secretary, receptionist
+❌ Non-job emails: newsletters, bar exam prep, CLE/CPD events, scholarship/bursary, webinars
+
+STEP 3: Return ONLY a valid JSON array (no markdown, no preamble, just the raw JSON array). Each element:
+{
+  "TITLE": "exact job title from email",
+  "COMPANY": "firm or company name",
+  "LOCATION": "city, province",
+  "CATEGORY": "Associate" or "Student",
+  "EXP_YEARS": "0-2 years" or "newly called" or "articling" etc,
+  "URL": "application URL if present, else empty string",
+  "APPLY_URL": "apply link if different from URL, else empty string",
+  "DATE": "ISO date string of email (YYYY-MM-DD)",
+  "SOURCE": "gmail",
+  "SNIPPET": "one sentence describing the role (max 120 chars)",
+  "EMAIL_SUBJECT": "original email subject line"
+}
+
+If no matching jobs found, return: []
+
+CRITICAL: Only include jobs that pass ALL filters. Better to return fewer high-quality results than include borderline matches.`;
+
+  setStep("Searching Gmail for job emails…", 25);
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4000,
+        mcp_servers: [{
+          type: "url",
+          url:  "https://gmail.mcp.claude.com/mcp",
+          name: "gmail"
+        }],
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    setStep("Analysing emails with AI…", 55);
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`API error ${response.status}: ${err}`);
+    }
+
+    const data = await response.json();
+    setStep("Parsing results…", 80);
+
+    /* ── Extract text from response (handles tool_use + text blocks) ── */
+    let rawText = "";
+    for (const block of (data.content || [])) {
+      if (block.type === "text") rawText += block.text;
+    }
+
+    /* ── Parse JSON from the response ────────────────────────────────── */
+    let jobs = [];
+    try {
+      // Strip markdown fences if present
+      const cleaned = rawText.replace(/```json|```/gi,"").trim();
+      // Find the JSON array
+      const match = cleaned.match(/\[[\s\S]*\]/);
+      if (match) jobs = JSON.parse(match[0]);
+    } catch(parseErr) {
+      console.warn("JSON parse failed, raw text:", rawText);
+      jobs = [];
+    }
+
+    setStep("Done!", 100);
+    await new Promise(r=>setTimeout(r,400));
+    prog.classList.remove("active");
+
+    /* ── Update stats ─────────────────────────────────────────────── */
+    gmailJobs = jobs;
+    const now = new Date();
+    gmailScanStats = {
+      emailsRead: "searched",
+      matched:    jobs.length,
+      rejected:   "filtered by AI",
+      wrongLoc:   "filtered by AI",
+      lastScan:   now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})
+    };
+    updateGmailSidebar();
+
+    document.getElementById("statGmail").textContent = jobs.length;
+    document.getElementById("statGmailSub").textContent =
+      jobs.length > 0 ? `+${jobs.length} this scan` : "0 matches";
+    document.getElementById("tabBadgeGmail").textContent = jobs.length || "0";
+    document.getElementById("tabBadgeGmail").className =
+      jobs.length > 0 ? "tab-badge new" : "tab-badge";
+
+    /* ── Render results ───────────────────────────────────────────── */
+    if (!jobs.length) {
+      sumEl.className="gmail-summary warn active";
+      sumEl.textContent=`⚠  No matching jobs found in the last ${days} days. Try expanding the search window or check your inbox for job alert emails.`;
+      list.innerHTML=`<div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">No matches found</div>
+        <div class="empty-sub">No emails in the last ${days} days contained law job listings for Ontario or Alberta associates with 0–2 years' experience.<br/><br/>Try extending the search window or ensure you're subscribed to job alert services like ZSA, The Counsel Network, or Indeed/LinkedIn alerts.</div>
+      </div>`;
+    } else {
+      sumEl.className="gmail-summary active";
+      sumEl.textContent=`✓  Found ${jobs.length} matching job${jobs.length===1?"":"s"} from your Gmail inbox — filtered for ON/AB, 0–2 yrs experience`;
+      list.innerHTML = jobs.map(j=>renderJobCard(j, true)).join("");
+    }
+
+  } catch(err) {
+    prog.classList.remove("active");
+    sumEl.className="gmail-summary err active";
+    sumEl.textContent=`✗  Scan failed: ${err.message}`;
+    list.innerHTML=`<div class="empty-state">
+      <div class="empty-icon">⚠</div>
+      <div class="empty-title">Scan failed</div>
+      <div class="empty-sub">${escHtml(err.message)}<br/><br/>Make sure you are logged in to claude.ai with Gmail connected in your Tools settings.</div>
+    </div>`;
+    console.error("Gmail scan error:", err);
+  }
+
+  btn.disabled=false;
+  document.getElementById("scanBtnTxt").textContent="🔍 Scan Gmail";
+}
+
+function updateGmailSidebar(){
+  document.getElementById("gsLastScan").textContent   = gmailScanStats.lastScan    || "—";
+  document.getElementById("gsEmailsRead").textContent = gmailScanStats.emailsRead  || "—";
+  document.getElementById("gsMatched").textContent    = gmailScanStats.matched     ?? "—";
+  document.getElementById("gsRejected").textContent   = gmailScanStats.rejected    || "—";
+  document.getElementById("gsWrongLoc").textContent   = gmailScanStats.wrongLoc    || "—";
+}
+
+/* ── Charts & companies ─────────────────────────────────────────────── */
 function renderRunChart(runs){
   const c=document.getElementById("runChart");
   if(!runs.length){c.innerHTML="<span style='color:var(--ink-3);font-size:11px'>No history yet</span>";return;}
@@ -930,13 +906,11 @@ function renderTopCompanies(){
   el.innerHTML=sorted.map(([n,c])=>`
     <div class="co-row">
       <span class="co-name">${escHtml(n)}</span>
-      <div class="co-bar-wrap">
-        <div class="co-bar" style="width:${Math.round((c/max)*60)}px"></div>
-        <span class="co-ct">${c}</span>
-      </div>
+      <div class="co-bar-wrap"><div class="co-bar" style="width:${Math.round((c/max)*60)}px"></div><span class="co-ct">${c}</span></div>
     </div>`).join("");
 }
 
+/* ── Utilities ────────────────────────────────────────────────────────── */
 function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
 function copyUrl(){
@@ -956,8 +930,9 @@ document.getElementById("searchInput").addEventListener("input",e=>{
   searchQuery=e.target.value.toLowerCase().trim(); applyFilterAndRender();
 });
 
+/* ── Init ───────────────────────────────────────────────────────────────── */
 fetchData();
-setInterval(fetchData,5*60*1000);
+setInterval(fetchData, 5*60*1000);
 </script>
 </body>
 </html>
