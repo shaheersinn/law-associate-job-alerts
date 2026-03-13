@@ -6,840 +6,958 @@
 <title>LexScan — Law Job Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-  /* ── Reset & Base ────────────────────────────────────────────────────── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ═══════════════════════════════════════════════════════════════════════
+   LEXSCAN — PARCHMENT & GOLD EDITION
+   Warm cream base · rich gold accent · premium legal document feel
+═══════════════════════════════════════════════════════════════════════ */
 
-  :root {
-    --bg:        #0a0c0f;
-    --bg2:       #111318;
-    --bg3:       #181c23;
-    --border:    #252932;
-    --border2:   #2e3440;
-    --gold:      #c9a84c;
-    --gold2:     #e8c87a;
-    --gold-dim:  #7a6230;
-    --green:     #3dbd84;
-    --green-dim: #1a4a35;
-    --red:       #e05555;
-    --red-dim:   #4a1a1a;
-    --blue:      #5b9cf6;
-    --text:      #e8e9ea;
-    --text2:     #9aa3b0;
-    --text3:     #5a6272;
-    --card-hover:#1e222d;
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html { scroll-behavior: smooth; }
+:root {
+  /* ── Parchment backgrounds ── */
+  --parch-0:   #FBF7F0;   /* page base */
+  --parch-1:   #F7F2E8;   /* hero / sections */
+  --parch-2:   #F2EBD9;   /* subtle hover */
+  --parch-3:   #EBE1CC;   /* input fills */
+  --card:      #FFFEF9;   /* white-ish cards */
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    font-size: 15px;
-    line-height: 1.6;
-  }
+  /* ── Borders ── */
+  --line:      #E4D9C3;
+  --line2:     #D5C8AD;
 
-  /* ── Subtle grain overlay ─────────────────────────────────────────────── */
-  body::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-  }
+  /* ── Gold system ── */
+  --gold:      #A8782A;   /* primary gold */
+  --gold2:     #C4912F;   /* mid gold */
+  --gold3:     #DEB96A;   /* light gold */
+  --gold4:     #F2D98A;   /* pale gold highlight */
+  --gold-sub:  rgba(168,120,42,0.08);
+  --gold-glow: rgba(168,120,42,0.15);
 
-  /* ── Layout ───────────────────────────────────────────────────────────── */
-  .shell { position: relative; z-index: 1; }
+  /* ── Ink (text) ── */
+  --ink-1:     #2A2117;   /* deep warm black */
+  --ink-2:     #5C4E36;   /* medium warm brown */
+  --ink-3:     #9A8A6E;   /* muted caption */
+  --ink-4:     #C4B89A;   /* placeholder / disabled */
 
-  /* ── Header ────────────────────────────────────────────────────────────  */
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 40px;
-    border-bottom: 1px solid var(--border);
-    background: rgba(10,12,15,0.95);
-    backdrop-filter: blur(10px);
-    position: sticky; top: 0; z-index: 100;
-  }
+  /* ── Semantic ── */
+  --green:     #2D7A50;
+  --green-sub: rgba(45,122,80,0.08);
+  --green-ln:  rgba(45,122,80,0.2);
+  --blue:      #2A5FA8;
+  --blue-sub:  rgba(42,95,168,0.08);
+  --blue-ln:   rgba(42,95,168,0.2);
+  --red:       #B03030;
 
-  .logo {
-    display: flex; align-items: center; gap: 12px;
-  }
-  .logo-icon {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--gold), var(--gold2));
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-  }
-  .logo-text {
-    font-family: 'Playfair Display', serif;
-    font-size: 22px; font-weight: 700;
-    letter-spacing: -0.5px;
-    color: var(--text);
-  }
-  .logo-text span { color: var(--gold); }
+  /* ── Shadows ── */
+  --sh-sm:  0 1px 3px rgba(80,50,10,0.07), 0 1px 2px rgba(80,50,10,0.04);
+  --sh-md:  0 4px 16px rgba(80,50,10,0.08), 0 1px 4px rgba(80,50,10,0.04);
+  --sh-card:0 2px 8px rgba(80,50,10,0.06), 0 0 0 1px rgba(80,50,10,0.04);
+}
 
-  .header-meta {
-    display: flex; align-items: center; gap: 20px;
-  }
-  .pulse-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 8px var(--green);
-    animation: pulse 2s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%,100% { opacity:1; transform: scale(1); }
-    50%      { opacity:0.5; transform: scale(0.8); }
-  }
+html { scroll-behavior: smooth; }
 
-  .last-updated { font-size: 12px; color: var(--text3); font-family: 'DM Mono', monospace; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--parch-1); }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold2); }
 
-  /* ── Hero Banner ──────────────────────────────────────────────────────── */
-  .hero {
-    padding: 48px 40px 32px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(201,168,76,0.04) 0%, transparent 100%);
-  }
-  .hero h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(32px, 5vw, 54px);
-    font-weight: 900;
-    letter-spacing: -1.5px;
-    line-height: 1.1;
-    background: linear-gradient(135deg, var(--text) 30%, var(--gold));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .hero-sub {
-    margin-top: 10px;
-    color: var(--text2);
-    font-size: 15px;
-    max-width: 500px;
-  }
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--parch-0);
+  color: var(--ink-1);
+  min-height: 100vh;
+  font-size: 14.5px;
+  line-height: 1.65;
+}
 
-  /* ── Stats Row ────────────────────────────────────────────────────────── */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1px;
-    background: var(--border);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .stat-card {
-    background: var(--bg2);
-    padding: 24px 28px;
-    transition: background 0.2s;
-  }
-  .stat-card:hover { background: var(--bg3); }
-  .stat-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text3);
-    font-weight: 600;
-  }
-  .stat-value {
-    font-family: 'Playfair Display', serif;
-    font-size: 36px;
-    font-weight: 700;
-    color: var(--gold2);
-    line-height: 1.1;
-    margin-top: 6px;
-  }
-  .stat-delta {
-    font-size: 12px; color: var(--green);
-    margin-top: 4px;
-    font-family: 'DM Mono', monospace;
-  }
+/* ── Parchment texture ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
 
-  /* ── Main content grid ────────────────────────────────────────────────── */
-  .content-grid {
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 0;
-    min-height: calc(100vh - 200px);
-  }
+.shell { position: relative; z-index: 1; }
 
-  /* ── Left: Jobs panel ─────────────────────────────────────────────────── */
-  .jobs-panel { border-right: 1px solid var(--border); }
+/* ═══════════════════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════════════════ */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 44px; height: 68px;
+  background: rgba(251,247,240,0.94);
+  backdrop-filter: blur(20px) saturate(130%);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 100;
+}
 
-  .panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 32px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-    position: sticky; top: 77px; z-index: 50;
-  }
+.logo { display: flex; align-items: center; gap: 14px; text-decoration: none; }
 
-  .panel-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 18px; font-weight: 700;
-  }
+.logo-seal {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: linear-gradient(145deg, var(--gold) 0%, var(--gold2) 60%, #8B6220 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: #FFF8E8; flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(168,120,42,0.35),
+              inset 0 1px 0 rgba(255,248,220,0.25);
+  position: relative; overflow: hidden;
+}
+.logo-seal::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(145deg, rgba(255,248,220,0.2) 0%, transparent 55%);
+}
 
-  .filter-bar {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  }
+.logo-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 25px; font-weight: 700;
+  letter-spacing: 0.4px; color: var(--ink-1);
+}
+.logo-name em { font-style: italic; color: var(--gold); }
 
-  .filter-btn {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px; font-weight: 500;
-    padding: 6px 14px;
-    border: 1px solid var(--border2);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text2);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .filter-btn:hover, .filter-btn.active {
-    background: var(--gold);
-    border-color: var(--gold);
-    color: #0a0c0f;
-  }
+.logo-pipe { width: 1px; height: 22px; background: var(--line2); margin: 0 2px; }
 
-  .search-box {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    padding: 7px 14px;
-    background: var(--bg3);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    color: var(--text);
-    outline: none;
-    width: 220px;
-    transition: border-color 0.2s;
-  }
-  .search-box::placeholder { color: var(--text3); }
-  .search-box:focus { border-color: var(--gold-dim); }
+.logo-tag {
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 2.5px; text-transform: uppercase; color: var(--ink-3);
+}
 
-  /* ── Job list ─────────────────────────────────────────────────────────── */
-  .jobs-list { padding: 0; }
+.hdr-right { display: flex; align-items: center; gap: 16px; }
 
-  .job-card {
-    display: grid;
-    grid-template-columns: 4px 1fr auto;
-    gap: 0 16px;
-    padding: 20px 32px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.15s;
-    align-items: start;
-  }
-  .job-card:hover { background: var(--card-hover); }
+.live-badge {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 13px;
+  background: var(--green-sub);
+  border: 1px solid var(--green-ln);
+  border-radius: 999px;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px rgba(45,122,80,0.2);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(45,122,80,0.2); }
+  50%     { box-shadow: 0 0 0 5px rgba(45,122,80,0.06); }
+}
+.live-lbl { font-size: 11px; font-weight: 600; color: var(--green); }
 
-  .job-accent {
-    grid-row: 1 / -1;
-    width: 3px;
-    border-radius: 999px;
-    align-self: stretch;
-    background: var(--gold-dim);
-    transition: background 0.2s;
-  }
-  .job-card:hover .job-accent { background: var(--gold); }
-  .job-card.student .job-accent { background: var(--blue); opacity: 0.5; }
-  .job-card.student:hover .job-accent { background: var(--blue); opacity: 1; }
+.hdr-ts {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--ink-3);
+}
 
-  .job-main {}
-  .job-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 16px; font-weight: 700;
-    color: var(--text);
-    line-height: 1.3;
-  }
-  .job-company {
-    font-size: 13px; color: var(--text2); margin-top: 4px;
-  }
-  .job-meta {
-    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;
-  }
-  .badge {
-    font-size: 10px; font-weight: 600;
-    letter-spacing: 1px; text-transform: uppercase;
-    padding: 3px 8px; border-radius: 4px;
-  }
-  .badge-assoc { background: rgba(201,168,76,0.12); color: var(--gold); }
-  .badge-student { background: rgba(91,156,246,0.12); color: var(--blue); }
-  .badge-source {
-    background: rgba(255,255,255,0.04);
-    color: var(--text3);
-    font-family: 'DM Mono', monospace;
-  }
-  .badge-score { background: rgba(61,189,132,0.1); color: var(--green); }
+/* ═══════════════════════════════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════════════════════════════ */
+.hero {
+  padding: 64px 44px 52px;
+  border-bottom: 1px solid var(--line);
+  background: var(--parch-1);
+  position: relative; overflow: hidden;
+}
 
-  .job-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
-  .btn-apply {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px; font-weight: 600;
-    padding: 7px 16px;
-    background: var(--gold);
-    color: #0a0c0f;
-    border: none; border-radius: 6px;
-    cursor: pointer; text-decoration: none;
-    transition: background 0.15s;
-    white-space: nowrap;
-  }
-  .btn-apply:hover { background: var(--gold2); }
-  .job-date { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+/* Decorative gold watermark — scales symbol */
+.hero-wm {
+  position: absolute; right: 60px; top: 30px;
+  font-size: 180px; line-height: 1;
+  color: var(--gold3); opacity: 0.08;
+  font-family: 'Cormorant Garamond', serif;
+  user-select: none; pointer-events: none;
+  font-weight: 700;
+}
 
-  /* ── Empty / loading states ───────────────────────────────────────────── */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 80px 40px;
-    color: var(--text3);
-    text-align: center;
-  }
-  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
-  .empty-title { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--text2); }
-  .empty-sub   { font-size: 13px; margin-top: 8px; }
+/* Top gold rule */
+.hero::before {
+  content: '';
+  position: absolute; top: 0; left: 0; width: 200px; height: 2px;
+  background: linear-gradient(90deg, var(--gold2), transparent);
+}
 
-  .spinner {
-    width: 32px; height: 32px;
-    border: 3px solid var(--border2);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    margin: 0 auto 20px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+.hero-kicker {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 20px;
+  opacity: 0; animation: up 0.6s 0.1s ease forwards;
+}
+.hero-kicker-rule { width: 24px; height: 1.5px; background: var(--gold2); }
 
-  /* ── Right: Sidebar ───────────────────────────────────────────────────── */
-  .sidebar { padding: 0; }
+.hero h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(42px, 5.5vw, 70px);
+  font-weight: 600; line-height: 1.03;
+  letter-spacing: -1.5px; color: var(--ink-1);
+  opacity: 0; animation: up 0.7s 0.2s ease forwards;
+}
+.hero h1 em { font-style: italic; color: var(--gold); }
 
-  .sidebar-section {
-    padding: 24px;
-    border-bottom: 1px solid var(--border);
-  }
-  .sidebar-section:last-child { border-bottom: none; }
+.hero-ornament {
+  display: flex; align-items: center; gap: 10px;
+  margin: 22px 0;
+  opacity: 0; animation: up 0.6s 0.32s ease forwards;
+}
+.hero-ornament-line { flex: 0 0 44px; height: 1px; background: var(--gold3); }
+.hero-ornament-diamond {
+  width: 6px; height: 6px;
+  background: var(--gold2);
+  transform: rotate(45deg);
+}
 
-  .sidebar-title {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text3);
-    font-weight: 600;
-    margin-bottom: 16px;
-  }
+.hero-sub {
+  color: var(--ink-2); font-size: 15px; line-height: 1.8;
+  max-width: 520px;
+  opacity: 0; animation: up 0.7s 0.38s ease forwards;
+}
 
-  /* Model training card */
-  .model-card {
-    background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(10,12,15,0));
-    border: 1px solid var(--gold-dim);
-    border-radius: 10px;
-    padding: 16px;
-  }
-  .model-status {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 12px;
-  }
-  .model-status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 8px var(--green);
-  }
-  .model-status-label { font-size: 12px; font-weight: 600; color: var(--green); }
-  .model-metric {
-    display: flex; justify-content: space-between;
-    font-size: 12px; padding: 4px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
-  .model-metric:last-child { border-bottom: none; }
-  .model-metric-key   { color: var(--text3); }
-  .model-metric-value { color: var(--text); font-family: 'DM Mono', monospace; }
+@keyframes up {
+  from { opacity:0; transform: translateY(14px); }
+  to   { opacity:1; transform: translateY(0); }
+}
 
-  /* Run history bar chart */
-  .run-chart {
-    display: flex; align-items: flex-end; gap: 3px;
-    height: 56px; margin-top: 8px;
-  }
-  .run-bar {
-    flex: 1;
-    background: var(--gold-dim);
-    border-radius: 2px 2px 0 0;
-    transition: background 0.2s;
-    min-height: 2px;
-    cursor: pointer;
-    position: relative;
-  }
-  .run-bar:hover { background: var(--gold); }
-  .run-bar-tip {
-    position: absolute; bottom: calc(100% + 6px); left: 50%;
-    transform: translateX(-50%);
-    background: var(--bg3); border: 1px solid var(--border2);
-    border-radius: 4px; padding: 4px 8px;
-    font-size: 11px; color: var(--text2); white-space: nowrap;
-    display: none; z-index: 10;
-    font-family: 'DM Mono', monospace;
-  }
-  .run-bar:hover .run-bar-tip { display: block; }
+/* ═══════════════════════════════════════════════════════════════════════
+   STATS ROW
+═══════════════════════════════════════════════════════════════════════ */
+.stats-row {
+  display: grid; grid-template-columns: repeat(5,1fr);
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
 
-  /* Top companies */
-  .company-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
-  }
-  .company-row:last-child { border-bottom: none; }
-  .company-name { color: var(--text); }
-  .company-count {
-    font-family: 'DM Mono', monospace; font-size: 12px;
-    color: var(--gold);
-    background: rgba(201,168,76,0.08);
-    padding: 2px 8px; border-radius: 4px;
-  }
+.stat-card {
+  padding: 28px 30px;
+  border-right: 1px solid var(--line);
+  position: relative; overflow: hidden;
+  transition: background 0.22s;
+  opacity: 0; animation: up 0.55s ease forwards;
+}
+.stat-card:last-child { border-right: none; }
+.stat-card:hover { background: var(--parch-0); }
+.stat-card:hover .stat-bar { transform: scaleX(1); }
 
-  /* Config panel */
-  .config-note {
-    font-size: 12px; color: var(--text3); line-height: 1.7;
-  }
-  .config-key {
-    font-family: 'DM Mono', monospace;
-    background: var(--bg3); border: 1px solid var(--border2);
-    border-radius: 4px; padding: 1px 6px;
-    color: var(--gold2); font-size: 11px;
-  }
-  .config-url-box {
-    margin-top: 10px;
-    background: var(--bg3);
-    border: 1px solid var(--border2);
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--text2);
-    word-break: break-all;
-    cursor: pointer;
-    transition: border-color 0.2s;
-  }
-  .config-url-box:hover { border-color: var(--gold-dim); }
+.stat-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold), var(--gold3), transparent);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.35s ease;
+}
 
-  /* ── Pagination ───────────────────────────────────────────────────────── */
-  .pagination {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 24px;
-    border-top: 1px solid var(--border);
-  }
-  .page-btn {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px; padding: 6px 12px;
-    background: var(--bg3); border: 1px solid var(--border2);
-    border-radius: 6px; color: var(--text2); cursor: pointer;
-    transition: all 0.15s;
-  }
-  .page-btn:hover, .page-btn.active {
-    background: var(--gold); border-color: var(--gold); color: #0a0c0f;
-  }
-  .page-btn:disabled { opacity: 0.3; cursor: default; }
+.stat-card:nth-child(1) { animation-delay:.35s }
+.stat-card:nth-child(2) { animation-delay:.45s }
+.stat-card:nth-child(3) { animation-delay:.55s }
+.stat-card:nth-child(4) { animation-delay:.65s }
+.stat-card:nth-child(5) { animation-delay:.75s }
 
-  /* ── Toast ────────────────────────────────────────────────────────────── */
-  .toast {
-    position: fixed; bottom: 24px; right: 24px; z-index: 999;
-    background: var(--bg3); border: 1px solid var(--green);
-    border-radius: 8px; padding: 12px 20px;
-    font-size: 13px; color: var(--green);
-    animation: slideUp 0.3s ease; display: none;
-  }
-  @keyframes slideUp {
-    from { transform: translateY(10px); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
-  }
+.stat-lbl {
+  font-size: 9.5px; font-weight: 700;
+  letter-spacing: 2.5px; text-transform: uppercase; color: var(--ink-3);
+}
+.stat-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 46px; font-weight: 600; line-height: 1.05;
+  color: var(--gold); margin-top: 4px;
+}
+.stat-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--green); margin-top: 4px;
+}
+.stat-note.dim { color: var(--ink-3); }
 
-  /* ── Responsive ───────────────────────────────────────────────────────── */
-  @media (max-width: 900px) {
-    .content-grid { grid-template-columns: 1fr; }
-    .sidebar { border-top: 1px solid var(--border); }
-    header { padding: 16px 20px; }
-    .hero  { padding: 28px 20px; }
-    .panel-header { padding: 16px 20px; top: 69px; }
-    .job-card { padding: 16px 20px; }
-    .filter-bar { display: none; }
-    .search-box { width: 180px; }
-  }
+/* ═══════════════════════════════════════════════════════════════════════
+   DATA BANNER
+═══════════════════════════════════════════════════════════════════════ */
+.data-banner {
+  display: none; align-items: center; gap: 10px;
+  padding: 9px 44px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
+  border-bottom: 1px solid var(--line);
+}
+.data-banner.ok   { background: var(--green-sub); color: var(--green); border-color: var(--green-ln); }
+.data-banner.warn { background: var(--gold-sub);  color: var(--gold);  border-color: rgba(168,120,42,0.2); }
+.data-banner.err  { background: rgba(176,48,48,0.05); color: var(--red); border-color: rgba(176,48,48,0.2); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CONTENT GRID
+═══════════════════════════════════════════════════════════════════════ */
+.content-grid {
+  display: grid; grid-template-columns: 1fr 340px;
+  min-height: calc(100vh - 260px);
+  align-items: start;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   JOBS PANEL
+═══════════════════════════════════════════════════════════════════════ */
+.jobs-panel { border-right: 1px solid var(--line); }
+
+.panel-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 32px;
+  background: rgba(251,247,240,0.95);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 68px; z-index: 50; gap: 16px;
+}
+
+.panel-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 19px; font-weight: 600; color: var(--ink-1); flex-shrink: 0;
+}
+.panel-ct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--ink-3); margin-left: 6px;
+}
+
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.srch-wrap { position: relative; }
+.srch-ico {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--ink-3); font-size: 14px; pointer-events: none;
+}
+.srch-box {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  padding: 7px 14px 7px 32px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 8px; color: var(--ink-1); outline: none; width: 210px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: var(--sh-sm);
+}
+.srch-box::placeholder { color: var(--ink-4); }
+.srch-box:focus {
+  border-color: var(--gold2);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.filt-btn {
+  font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 500;
+  padding: 5px 15px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--card);
+  color: var(--ink-2); cursor: pointer; transition: all 0.18s;
+  box-shadow: var(--sh-sm);
+}
+.filt-btn:hover { border-color: var(--gold2); color: var(--gold); }
+.filt-btn.active {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+  border-color: transparent; color: #FFF8E8; font-weight: 600;
+  box-shadow: 0 2px 10px rgba(168,120,42,0.28);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   JOB CARDS
+═══════════════════════════════════════════════════════════════════════ */
+.job-card {
+  display: flex; align-items: stretch;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  transition: background 0.18s;
+  position: relative;
+}
+.job-card:hover { background: var(--parch-0); }
+.job-card:hover .jstripe { background: var(--gold2); opacity: 1; }
+.job-card.student:hover .jstripe { background: var(--blue); opacity: 1; }
+.job-card:hover .japply { opacity: 1; transform: translateX(0); }
+
+.jstripe {
+  width: 3px; flex-shrink: 0;
+  background: var(--line2); opacity: 0.6;
+  transition: background 0.18s, opacity 0.18s;
+}
+.job-card.student .jstripe { background: var(--blue-ln); }
+
+.jinner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 28px; flex: 1; gap: 20px;
+}
+.jmain { flex:1; min-width:0; }
+
+.jtitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18.5px; font-weight: 600;
+  color: var(--ink-1); line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color 0.18s;
+}
+.job-card:hover .jtitle { color: var(--gold); }
+
+.jfirm {
+  font-size: 12.5px; color: var(--ink-2); margin-top: 3px;
+  display: flex; align-items: center; gap: 6px;
+}
+.jdot { color: var(--ink-4); }
+
+.jmeta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+.badge {
+  font-size: 9.5px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 4px; border: 1px solid transparent;
+}
+.b-assoc {
+  background: var(--gold-sub);
+  border-color: rgba(168,120,42,0.2); color: var(--gold);
+}
+.b-student {
+  background: var(--blue-sub);
+  border-color: var(--blue-ln); color: var(--blue);
+}
+.b-score {
+  background: var(--green-sub);
+  border-color: var(--green-ln); color: var(--green);
+  font-family: 'JetBrains Mono', monospace;
+}
+.b-src {
+  background: var(--parch-2);
+  border-color: var(--line); color: var(--ink-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.jactions {
+  display: flex; flex-direction: column;
+  align-items: flex-end; gap: 8px; flex-shrink: 0;
+}
+.japply {
+  font-family: 'Outfit', sans-serif; font-size: 12.5px; font-weight: 600;
+  padding: 8px 20px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold2) 100%);
+  color: #FFF8E8; border: none; border-radius: 7px;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(168,120,42,0.25);
+  transition: all 0.18s;
+  opacity: 0.85; transform: translateX(5px);
+}
+.japply:hover {
+  background: linear-gradient(135deg, var(--gold2) 0%, var(--gold3) 100%);
+  box-shadow: 0 4px 14px rgba(168,120,42,0.35);
+  opacity: 1; transform: translateX(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   EMPTY / SPINNER
+═══════════════════════════════════════════════════════════════════════ */
+.empty-state {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 80px 40px; text-align: center;
+  background: var(--card);
+}
+.empty-icon { font-size: 44px; margin-bottom: 20px; opacity: 0.25; }
+.empty-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px; font-weight: 600; color: var(--ink-2);
+}
+.empty-sub { font-size: 13px; margin-top: 10px; line-height: 1.85; max-width: 440px; color: var(--ink-2); }
+
+.spinner {
+  width: 30px; height: 30px;
+  border: 2px solid var(--line);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 24px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGINATION
+═══════════════════════════════════════════════════════════════════════ */
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 24px; border-top: 1px solid var(--line);
+  background: var(--card);
+}
+.page-btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  padding: 6px 13px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 6px; color: var(--ink-2); cursor: pointer;
+  transition: all 0.15s; box-shadow: var(--sh-sm);
+}
+.page-btn:hover { border-color: var(--gold2); color: var(--gold); }
+.page-btn.active {
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border-color: transparent; color: #FFF8E8; font-weight: 600;
+}
+.page-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════════════════════════════ */
+.sidebar { background: var(--parch-1); }
+
+.sb-block { padding: 28px 24px; border-bottom: 1px solid var(--line); }
+
+.sb-lbl {
+  font-size: 9.5px; font-weight: 700;
+  letter-spacing: 2.5px; text-transform: uppercase; color: var(--ink-3);
+  margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+}
+.sb-lbl::after { content:''; flex:1; height:1px; background: var(--line); }
+
+/* Model card */
+.model-card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 18px;
+  box-shadow: var(--sh-sm); position: relative; overflow: hidden;
+}
+.model-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold), var(--gold3), transparent);
+}
+.mc-status { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.mc-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-sub);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+.mc-lbl { font-size: 12px; font-weight: 600; color: var(--green); }
+
+.mc-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px;
+}
+.mc-row:last-child { border-bottom: none; }
+.mc-k { color: var(--ink-2); }
+.mc-v { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--ink-1); font-weight:500; }
+
+/* Run chart */
+.run-chart {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 56px; margin-top: 4px;
+}
+.rbar {
+  flex: 1; min-height: 3px;
+  background: var(--gold-sub);
+  border: 1px solid rgba(168,120,42,0.1);
+  border-bottom: none;
+  border-radius: 2px 2px 0 0;
+  transition: background 0.2s;
+  cursor: pointer; position: relative;
+}
+.rbar:hover { background: var(--gold3); }
+.rbar-tip {
+  display: none;
+  position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink-1); color: var(--gold4);
+  border-radius: 6px; padding: 5px 10px;
+  font-size: 11px; white-space: nowrap; z-index: 10;
+  font-family: 'JetBrains Mono', monospace;
+  box-shadow: var(--sh-md);
+}
+.rbar:hover .rbar-tip { display: block; }
+
+/* Top companies */
+.co-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.co-row:last-child { border-bottom: none; }
+.co-name { color: var(--ink-1); }
+.co-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.co-bar {
+  height: 3px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold3));
+  min-width: 4px;
+}
+.co-ct { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); min-width:18px; text-align:right; font-weight:500; }
+
+/* Data source */
+.src-note { font-size: 12.5px; color: var(--ink-2); line-height: 1.8; }
+.ctag {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--gold-sub); border: 1px solid rgba(168,120,42,0.15);
+  border-radius: 4px; padding: 1px 7px;
+  color: var(--gold); font-size: 11px;
+}
+.url-box {
+  margin-top: 14px; background: var(--parch-3); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-2);
+  word-break: break-all; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.url-box:hover { border-color: var(--gold2); background: var(--card); }
+.url-hint { font-size: 10px; color: var(--ink-3); margin-top: 5px; text-align: right; font-family:'JetBrains Mono',monospace; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════════════ */
+.toast {
+  position: fixed; bottom: 28px; right: 28px; z-index: 999; display: none;
+  background: var(--ink-1); color: var(--gold4);
+  border-radius: 10px; padding: 12px 22px;
+  font-size: 13px; font-weight: 500;
+  animation: toastIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: var(--sh-md);
+}
+@keyframes toastIn {
+  from { transform: translateY(16px) scale(0.95); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1000px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .sidebar { border-top: 1px solid var(--line); }
+  .stats-row { grid-template-columns: repeat(3,1fr); }
+}
+@media (max-width: 700px) {
+  header { padding: 0 20px; }
+  .hero  { padding: 40px 20px 32px; }
+  .panel-hdr { padding: 14px 20px; top: 68px; }
+  .jinner { padding: 16px 20px; }
+  .filter-row { display: none; }
+  .srch-box { width: 160px; }
+  .stats-row { grid-template-columns: repeat(2,1fr); }
+  .logo-pipe, .logo-tag { display: none; }
+  .hero-wm { display: none; }
+}
 </style>
 </head>
 <body>
 <div class="shell">
 
-  <!-- ── Header ─────────────────────────────────────────────────────────── -->
-  <header>
-    <div class="logo">
-      <div class="logo-icon">⚖</div>
-      <span class="logo-text">Lex<span>Scan</span></span>
+<!-- HEADER -->
+<header>
+  <a class="logo" href="#">
+    <div class="logo-seal">⚖</div>
+    <div class="logo-name">Lex<em>Scan</em></div>
+    <div class="logo-pipe"></div>
+    <div class="logo-tag">Law Intelligence</div>
+  </a>
+  <div class="hdr-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      <span class="live-lbl">Live</span>
     </div>
-    <div class="header-meta">
-      <div class="pulse-dot" id="statusDot"></div>
-      <span class="last-updated" id="lastUpdated">Loading…</span>
-    </div>
-  </header>
-
-  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
-  <div class="hero">
-    <h1>Law Associate<br/>Job Intelligence</h1>
-    <p class="hero-sub">50 Canadian law firms scraped every 2 hours. AI-filtered for ON/AB. Self-training model evolves with every run.</p>
+    <span class="hdr-ts" id="lastUpdated">—</span>
   </div>
+</header>
 
-  <!-- ── Stats Row ──────────────────────────────────────────────────────── -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-label">Total Jobs Found</div>
-      <div class="stat-value" id="statTotal">—</div>
-      <div class="stat-delta" id="statTotalDelta"></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Training Runs</div>
-      <div class="stat-value" id="statRuns">—</div>
-      <div class="stat-delta">auto-trains every run</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Score Threshold</div>
-      <div class="stat-value" id="statThreshold">—</div>
-      <div class="stat-delta">adaptive</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Sites Monitored</div>
-      <div class="stat-value">50</div>
-      <div class="stat-delta">+30 new firms added</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Alert Channel</div>
-      <div class="stat-value" style="font-size:28px;">✈</div>
-      <div class="stat-delta">Telegram</div>
-    </div>
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-wm">⚖</div>
+  <div class="hero-kicker">
+    <span class="hero-kicker-rule"></span>
+    Canadian Law Market
   </div>
+  <h1>Associate &amp; <em>Articling</em><br>Intelligence</h1>
+  <div class="hero-ornament">
+    <div class="hero-ornament-line"></div>
+    <div class="hero-ornament-diamond"></div>
+    <div class="hero-ornament-line" style="flex:0 0 24px"></div>
+  </div>
+  <p class="hero-sub">50+ Canadian law firms scraped every 2 hours. Self-training AI model filters for Ontario &amp; Alberta. Every listing scored, ranked, and alerted via Telegram.</p>
+</div>
 
-  <!-- ── Content Grid ───────────────────────────────────────────────────── -->
-  <div class="content-grid">
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-bar"></div>
+    <div class="stat-lbl">All-Time Jobs</div>
+    <div class="stat-val" id="statTotal">—</div>
+    <div class="stat-note" id="statTotalDelta"></div>
+  </div>
+  <div class="stat-card"><div class="stat-bar"></div>
+    <div class="stat-lbl">Training Runs</div>
+    <div class="stat-val" id="statRuns">—</div>
+    <div class="stat-note">self-improves each run</div>
+  </div>
+  <div class="stat-card"><div class="stat-bar"></div>
+    <div class="stat-lbl">Score Threshold</div>
+    <div class="stat-val" id="statThreshold">—</div>
+    <div class="stat-note">adaptive</div>
+  </div>
+  <div class="stat-card"><div class="stat-bar"></div>
+    <div class="stat-lbl">Sites Monitored</div>
+    <div class="stat-val">50<span style="font-size:22px;color:var(--ink-3)">+</span></div>
+    <div class="stat-note dim">firms &amp; aggregators</div>
+  </div>
+  <div class="stat-card"><div class="stat-bar"></div>
+    <div class="stat-lbl">Alerts Via</div>
+    <div class="stat-val" style="font-size:36px">✈︎</div>
+    <div class="stat-note dim">Telegram · every 2 h</div>
+  </div>
+</div>
 
-    <!-- ── Jobs Panel ───────────────────────────────────────────────────── -->
-    <div class="jobs-panel">
-      <div class="panel-header">
+<!-- DATA BANNER -->
+<div class="data-banner" id="dataBanner"></div>
+
+<!-- CONTENT -->
+<div class="content-grid">
+
+  <!-- JOBS PANEL -->
+  <div class="jobs-panel">
+    <div class="panel-hdr">
+      <div style="display:flex;align-items:baseline;gap:4px">
         <span class="panel-title">Verified Listings</span>
-        <div class="filter-bar">
-          <input class="search-box" id="searchInput" type="text" placeholder="search title, firm…"/>
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="Associate">Associate</button>
-          <button class="filter-btn" data-filter="Student">Student</button>
-        </div>
+        <span class="panel-ct" id="listingCount"></span>
       </div>
-
-      <div class="jobs-list" id="jobsList">
-        <div class="empty-state">
-          <div class="spinner"></div>
-          <div class="empty-title">Fetching latest results…</div>
-          <div class="empty-sub">Reading from GitHub repository</div>
+      <div class="filter-row">
+        <div class="srch-wrap">
+          <span class="srch-ico">⌕</span>
+          <input class="srch-box" id="searchInput" type="text" placeholder="Search title or firm…"/>
         </div>
+        <button class="filt-btn active" data-filter="all">All</button>
+        <button class="filt-btn" data-filter="Associate">Associate</button>
+        <button class="filt-btn" data-filter="Student">Articling</button>
       </div>
-
-      <div class="pagination" id="pagination" style="display:none"></div>
     </div>
 
-    <!-- ── Sidebar ────────────────────────────────────────────────────────  -->
-    <div class="sidebar">
+    <div id="jobsList">
+      <div class="empty-state">
+        <div class="spinner"></div>
+        <div class="empty-title">Connecting to live data…</div>
+        <div class="empty-sub">Fetching from GitHub repository</div>
+      </div>
+    </div>
 
-      <div class="sidebar-section">
-        <div class="sidebar-title">Model Status</div>
-        <div class="model-card">
-          <div class="model-status">
-            <div class="model-status-dot"></div>
-            <span class="model-status-label">Self-training active</span>
-          </div>
-          <div class="model-metric">
-            <span class="model-metric-key">Training runs</span>
-            <span class="model-metric-value" id="mRuns">—</span>
-          </div>
-          <div class="model-metric">
-            <span class="model-metric-key">Score threshold</span>
-            <span class="model-metric-value" id="mThreshold">—</span>
-          </div>
-          <div class="model-metric">
-            <span class="model-metric-key">All-time jobs</span>
-            <span class="model-metric-value" id="mTotal">—</span>
-          </div>
-          <div class="model-metric">
-            <span class="model-metric-key">Last trained</span>
-            <span class="model-metric-value" id="mLastTrained">—</span>
-          </div>
-          <div class="model-metric">
-            <span class="model-metric-key">Next run ~</span>
-            <span class="model-metric-value" id="mNextRun">—</span>
-          </div>
+    <div class="pagination" id="pagination" style="display:none"></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="sb-block">
+      <div class="sb-lbl">Model Status</div>
+      <div class="model-card">
+        <div class="mc-status">
+          <div class="mc-dot"></div>
+          <span class="mc-lbl">Self-training active</span>
         </div>
+        <div class="mc-row"><span class="mc-k">Training runs</span><span class="mc-v" id="mRuns">—</span></div>
+        <div class="mc-row"><span class="mc-k">Score threshold</span><span class="mc-v" id="mThreshold">—</span></div>
+        <div class="mc-row"><span class="mc-k">All-time jobs</span><span class="mc-v" id="mTotal">—</span></div>
+        <div class="mc-row"><span class="mc-k">Last trained</span><span class="mc-v" id="mLastTrained">—</span></div>
+        <div class="mc-row"><span class="mc-k">Next run ~</span><span class="mc-v" id="mNextRun">—</span></div>
       </div>
+    </div>
 
-      <div class="sidebar-section">
-        <div class="sidebar-title">Jobs per Run (last 30)</div>
-        <div class="run-chart" id="runChart"></div>
+    <div class="sb-block">
+      <div class="sb-lbl">Jobs per Run (last 30)</div>
+      <div class="run-chart" id="runChart">
+        <span style="color:var(--ink-3);font-size:11.5px">No run history yet</span>
       </div>
+    </div>
 
-      <div class="sidebar-section">
-        <div class="sidebar-title">Top Companies</div>
-        <div id="topCompanies"></div>
-      </div>
+    <div class="sb-block">
+      <div class="sb-lbl">Top Firms</div>
+      <div id="topCompanies"></div>
+    </div>
 
-      <div class="sidebar-section">
-        <div class="sidebar-title">Data Source</div>
-        <p class="config-note">
-          This dashboard reads live from your GitHub repo.<br/><br/>
-          Set the <span class="config-key">GITHUB_USER</span> and
-          <span class="config-key">REPO_NAME</span> variables at the top of this
-          file to point to your fork.<br/><br/>
-          Current source:
-        </p>
-        <div class="config-url-box" id="dataUrl" onclick="copyUrl()"></div>
-      </div>
+    <div class="sb-block">
+      <div class="sb-lbl">Data Source</div>
+      <p class="src-note">
+        Live data read from your GitHub repo.<br/>
+        Set <span class="ctag">GITHUB_USER</span> and
+        <span class="ctag">REPO_NAME</span> at the top of this file.
+      </p>
+      <div class="url-box" id="dataUrl" onclick="copyUrl()"></div>
+      <div class="url-hint">click to copy ↑</div>
+    </div>
 
-    </div><!-- /sidebar -->
-
-  </div><!-- /content-grid -->
+  </div>
+</div>
 
 </div><!-- /shell -->
-
 <div class="toast" id="toast">✓ Copied to clipboard</div>
 
 <script>
-/* ─────────────────────────────────────────────────────────────────────────
-   CONFIGURATION — change these two variables to your GitHub username & repo
-   ────────────────────────────────────────────────────────────────────────  */
 const GITHUB_USER = "shaheersinn";
 const REPO_NAME   = "law-associate-job-alerts";
 const BRANCH      = "main";
 const DATA_FILE   = "results.json";
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Don't edit below unless you know what you're doing
-   ─────────────────────────────────────────────────────────────────────── */
-const RAW_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/${DATA_FILE}`;
-
+const RAW_URL     = `https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/${BRANCH}/${DATA_FILE}`;
 document.getElementById("dataUrl").textContent = RAW_URL;
 
-// ── State ──────────────────────────────────────────────────────────────────
-let allJobs    = [];
-let filteredJobs = [];
-let currentPage  = 1;
-const PAGE_SIZE  = 20;
-let activeFilter = "all";
-let searchQuery  = "";
+let allJobs=[], filteredJobs=[], currentPage=1;
+const PAGE_SIZE=20;
+let activeFilter="all", searchQuery="";
 
-// ── Fetch & render ─────────────────────────────────────────────────────────
+function animateCounter(el, target) {
+  const num = parseInt(String(target).replace(/\D/g,""))||0;
+  if(!num){el.textContent=target;return;}
+  const t0=performance.now();
+  (function step(now){
+    const p=Math.min((now-t0)/700,1), e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(num*e);
+    if(p<1) requestAnimationFrame(step); else el.textContent=target;
+  })(t0);
+}
+
 async function fetchData() {
+  const bn=document.getElementById("dataBanner");
+  bn.style.display="flex"; bn.className="data-banner warn";
+  bn.textContent="⟳  Fetching latest data from GitHub…";
   try {
-    const r = await fetch(RAW_URL + "?t=" + Date.now());
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
+    const r=await fetch(RAW_URL+"?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok) throw new Error(`GitHub returned HTTP ${r.status}. Check results.json exists and the workflow has run at least once.`);
+    const data=await r.json();
+    if(!data.runs||!data.runs.length){
+      bn.className="data-banner warn";
+      bn.textContent="⚠  results.json is empty — trigger a manual run: Actions → Law Associate Job Alerts → Run workflow";
+    } else {
+      bn.className="data-banner ok";
+      bn.textContent=`✓  Live — ${data.runs.length} run(s) · ${data.total_all_time??0} all-time jobs`;
+      setTimeout(()=>bn.style.display="none",5000);
+    }
     renderAll(data);
-  } catch (e) {
-    document.getElementById("jobsList").innerHTML = `
+  } catch(e){
+    bn.className="data-banner err"; bn.textContent=`✗  ${e.message}`;
+    document.getElementById("jobsList").innerHTML=`
       <div class="empty-state">
         <div class="empty-icon">⚠</div>
         <div class="empty-title">Could not load data</div>
-        <div class="empty-sub">${e.message}<br/>Make sure GITHUB_USER and REPO_NAME are set correctly.</div>
+        <div class="empty-sub">${escHtml(e.message)}<br/><br/>
+          <b>Most common fix:</b> Go to your GitHub repo → Actions →
+          Law Associate Job Alerts → Run workflow. After one successful run,
+          results.json will be committed and the dashboard will populate.
+        </div>
       </div>`;
   }
 }
 
-function renderAll(data) {
-  // Stats row
-  document.getElementById("statTotal").textContent     = data.total_all_time ?? "0";
-  document.getElementById("statRuns").textContent       = data.training_runs  ?? "0";
-  document.getElementById("statThreshold").textContent  = data.score_threshold ?? "5";
-  document.getElementById("mRuns").textContent          = data.training_runs  ?? "—";
-  document.getElementById("mThreshold").textContent     = data.score_threshold ?? "—";
-  document.getElementById("mTotal").textContent         = data.total_all_time ?? "—";
-
-  if (data.last_updated) {
-    const d = new Date(data.last_updated);
-    document.getElementById("lastUpdated").textContent = "Updated " + d.toLocaleString();
-    document.getElementById("mLastTrained").textContent = d.toLocaleTimeString();
-
-    // Next run ≈ last_updated + 2h
-    const next = new Date(d.getTime() + 2 * 60 * 60 * 1000);
-    const diff = Math.max(0, next - Date.now());
-    const h    = Math.floor(diff / 3600000);
-    const m    = Math.floor((diff % 3600000) / 60000);
-    document.getElementById("mNextRun").textContent = diff > 0 ? `in ${h}h ${m}m` : "soon";
+function renderAll(data){
+  animateCounter(document.getElementById("statTotal"), data.total_all_time??"0");
+  animateCounter(document.getElementById("statRuns"),  data.training_runs??"0");
+  document.getElementById("statThreshold").textContent = data.score_threshold??"5";
+  document.getElementById("mRuns").textContent      = data.training_runs??"—";
+  document.getElementById("mThreshold").textContent = data.score_threshold??"—";
+  document.getElementById("mTotal").textContent     = data.total_all_time??"—";
+  if(data.last_updated){
+    const d=new Date(data.last_updated);
+    document.getElementById("lastUpdated").textContent="Updated "+d.toLocaleString();
+    document.getElementById("mLastTrained").textContent=d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+    const nxt=new Date(d.getTime()+2*3600000), diff=Math.max(0,nxt-Date.now());
+    document.getElementById("mNextRun").textContent=diff>0?`in ${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m`:"soon";
   }
-
-  // Collect all jobs from all runs
-  allJobs = [];
-  const runs = (data.runs || []).slice().reverse();
-  for (const run of runs) {
-    for (const job of (run.jobs || [])) {
-      allJobs.push({ ...job, _run_ts: run.timestamp });
-    }
+  allJobs=[];
+  const runs=(data.runs||[]).slice().reverse();
+  for(const run of runs) for(const job of(run.jobs||[])) allJobs.push({...job,_run_ts:run.timestamp});
+  if(runs.length){
+    const n=runs[0].jobs_found||0;
+    document.getElementById("statTotalDelta").textContent=`+${n} this run`;
+    document.getElementById("statTotalDelta").className=n>0?"stat-note":"stat-note dim";
   }
-
-  // Latest run delta
-  if (runs.length > 0) {
-    const latest = runs[0].jobs_found || 0;
-    document.getElementById("statTotalDelta").textContent = `+${latest} this run`;
-  }
-
-  // Run chart
-  renderRunChart(runs.slice(0, 30).reverse());
-
-  // Top companies
+  renderRunChart(runs.slice(0,30).reverse());
   renderTopCompanies();
-
-  // Apply filters and render
   applyFilterAndRender();
 }
 
-function applyFilterAndRender() {
-  filteredJobs = allJobs.filter(job => {
-    const matchCat    = activeFilter === "all" || job.CATEGORY === activeFilter;
-    const matchSearch = !searchQuery ||
-      (job.TITLE   || "").toLowerCase().includes(searchQuery) ||
-      (job.COMPANY || "").toLowerCase().includes(searchQuery);
-    return matchCat && matchSearch;
+function applyFilterAndRender(){
+  filteredJobs=allJobs.filter(j=>{
+    const mc=activeFilter==="all"||j.CATEGORY===activeFilter;
+    const ms=!searchQuery||(j.TITLE||"").toLowerCase().includes(searchQuery)||(j.COMPANY||"").toLowerCase().includes(searchQuery);
+    return mc&&ms;
   });
-  currentPage = 1;
-  renderPage();
+  currentPage=1; renderPage();
 }
 
-function renderPage() {
-  const total = filteredJobs.length;
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const end   = Math.min(start + PAGE_SIZE, total);
-  const page  = filteredJobs.slice(start, end);
-
-  const list = document.getElementById("jobsList");
-
-  if (page.length === 0) {
-    list.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-title">No matching jobs</div>
-        <div class="empty-sub">Try adjusting your filters or search.</div>
-      </div>`;
-    document.getElementById("pagination").style.display = "none";
-    return;
+function renderPage(){
+  const total=filteredJobs.length, start=(currentPage-1)*PAGE_SIZE;
+  const page=filteredJobs.slice(start,start+PAGE_SIZE);
+  const lc=document.getElementById("listingCount");
+  if(lc) lc.textContent=total?`(${total})`:"";
+  const list=document.getElementById("jobsList");
+  if(!page.length){
+    list.innerHTML=`<div class="empty-state"><div class="empty-icon">⊘</div><div class="empty-title">No matching listings</div><div class="empty-sub">Try a different filter or search term.</div></div>`;
+    document.getElementById("pagination").style.display="none"; return;
   }
-
-  list.innerHTML = page.map(job => {
-    const cat        = job.CATEGORY || "Unknown";
-    const catBadge   = cat === "Associate"
-      ? `<span class="badge badge-assoc">Associate</span>`
-      : `<span class="badge badge-student">Student</span>`;
-    const scoreBadge = job.SCORE
-      ? `<span class="badge badge-score">score ${job.SCORE}</span>` : "";
-    const srcBadge   = job.SOURCE
-      ? `<span class="badge badge-source">${job.SOURCE}</span>` : "";
-    const date       = job._run_ts ? new Date(job._run_ts).toLocaleDateString() : "";
-    const cardClass  = cat === "Student" ? "job-card student" : "job-card";
-
-    return `
-    <div class="${cardClass}">
-      <div class="job-accent"></div>
-      <div class="job-main">
-        <div class="job-title">${escHtml(job.TITLE || "Untitled")}</div>
-        <div class="job-company">${escHtml(job.COMPANY || "")}</div>
-        <div class="job-meta">${catBadge}${scoreBadge}${srcBadge}</div>
-      </div>
-      <div class="job-actions">
-        <a class="btn-apply" href="${escHtml(job.URL || '#')}" target="_blank" rel="noopener">
-          Apply →
-        </a>
-        <span class="job-date">${date}</span>
+  list.innerHTML=page.map(job=>{
+    const cat=job.CATEGORY||"Unknown";
+    const cb=cat==="Associate"?`<span class="badge b-assoc">Associate</span>`:`<span class="badge b-student">Articling</span>`;
+    const sb=job.SCORE?`<span class="badge b-score">⚡ ${job.SCORE}</span>`:"";
+    const xb=job.SOURCE?`<span class="badge b-src">${escHtml(job.SOURCE)}</span>`:"";
+    const dt=job._run_ts?new Date(job._run_ts).toLocaleDateString("en-CA",{month:"short",day:"numeric"}):"";
+    return `<div class="job-card${cat==="Student"?" student":""}">
+      <div class="jstripe"></div>
+      <div class="jinner">
+        <div class="jmain">
+          <div class="jtitle">${escHtml(job.TITLE||"Untitled")}</div>
+          <div class="jfirm">${escHtml(job.COMPANY||"")}${dt?`<span class="jdot">·</span><span style="color:var(--ink-3)">${dt}</span>`:""}</div>
+          <div class="jmeta">${cb}${sb}${xb}</div>
+        </div>
+        <div class="jactions">
+          <a class="japply" href="${escHtml(job.URL||"#")}" target="_blank" rel="noopener">Apply →</a>
+        </div>
       </div>
     </div>`;
   }).join("");
-
-  // Pagination
-  const pages = Math.ceil(total / PAGE_SIZE);
-  const pag   = document.getElementById("pagination");
-  if (pages <= 1) { pag.style.display = "none"; return; }
-
-  pag.style.display = "flex";
-  let btns = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?"disabled":""}>←</button>`;
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1 || i === pages || Math.abs(i - currentPage) <= 1) {
-      btns += `<button class="page-btn ${i===currentPage?"active":""}" onclick="goPage(${i})">${i}</button>`;
-    } else if (Math.abs(i - currentPage) === 2) {
-      btns += `<span style="color:var(--text3)">…</span>`;
-    }
+  const pages=Math.ceil(total/PAGE_SIZE), pag=document.getElementById("pagination");
+  if(pages<=1){pag.style.display="none";return;}
+  pag.style.display="flex";
+  let b=`<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?"disabled":""}>←</button>`;
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-currentPage)<=1) b+=`<button class="page-btn ${i===currentPage?"active":""}" onclick="goPage(${i})">${i}</button>`;
+    else if(Math.abs(i-currentPage)===2) b+=`<span style="color:var(--ink-3);padding:0 4px">…</span>`;
   }
-  btns += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?"disabled":""}>→</button>`;
-  pag.innerHTML = btns;
+  b+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?"disabled":""}>→</button>`;
+  pag.innerHTML=b;
 }
 
-function goPage(n) {
-  const pages = Math.ceil(filteredJobs.length / PAGE_SIZE);
-  if (n < 1 || n > pages) return;
-  currentPage = n;
-  renderPage();
-  document.querySelector(".jobs-panel").scrollIntoView({ behavior: "smooth" });
+function goPage(n){
+  const pages=Math.ceil(filteredJobs.length/PAGE_SIZE);
+  if(n<1||n>pages) return;
+  currentPage=n; renderPage();
+  document.querySelector(".jobs-panel").scrollIntoView({behavior:"smooth"});
 }
 
-function renderRunChart(runs) {
-  const chart = document.getElementById("runChart");
-  if (!runs.length) { chart.innerHTML = "<span style='color:var(--text3);font-size:12px'>No run history yet</span>"; return; }
-
-  const max = Math.max(...runs.map(r => r.jobs_found || 0), 1);
-  chart.innerHTML = runs.map(r => {
-    const h   = Math.max(4, Math.round(((r.jobs_found || 0) / max) * 52));
-    const ts  = r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "";
-    return `<div class="run-bar" style="height:${h}px"><div class="run-bar-tip">${ts}: ${r.jobs_found ?? 0} jobs</div></div>`;
+function renderRunChart(runs){
+  const c=document.getElementById("runChart");
+  if(!runs.length){c.innerHTML="<span style='color:var(--ink-3);font-size:11px'>No history yet</span>";return;}
+  const max=Math.max(...runs.map(r=>r.jobs_found||0),1);
+  c.innerHTML=runs.map(r=>{
+    const h=Math.max(4,Math.round(((r.jobs_found||0)/max)*52));
+    const ts=r.timestamp?new Date(r.timestamp).toLocaleDateString("en-CA",{month:"short",day:"numeric"}):"";
+    return `<div class="rbar" style="height:${h}px"><div class="rbar-tip">${ts}: ${r.jobs_found??0} jobs</div></div>`;
   }).join("");
 }
 
-function renderTopCompanies() {
-  const counts = {};
-  for (const job of allJobs) {
-    const c = job.COMPANY || "Unknown";
-    counts[c] = (counts[c] || 0) + 1;
-  }
-  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0, 8);
-  const el     = document.getElementById("topCompanies");
-  if (!sorted.length) { el.innerHTML = `<p style="color:var(--text3);font-size:12px">No data yet</p>`; return; }
-  el.innerHTML = sorted.map(([name, count]) =>
-    `<div class="company-row"><span class="company-name">${escHtml(name)}</span><span class="company-count">${count}</span></div>`
-  ).join("");
+function renderTopCompanies(){
+  const counts={};
+  for(const j of allJobs){const c=j.COMPANY||"Unknown"; counts[c]=(counts[c]||0)+1;}
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const el=document.getElementById("topCompanies");
+  if(!sorted.length){el.innerHTML=`<p style="color:var(--ink-3);font-size:12px">No data yet</p>`;return;}
+  const max=sorted[0][1];
+  el.innerHTML=sorted.map(([n,c])=>`
+    <div class="co-row">
+      <span class="co-name">${escHtml(n)}</span>
+      <div class="co-bar-wrap">
+        <div class="co-bar" style="width:${Math.round((c/max)*60)}px"></div>
+        <span class="co-ct">${c}</span>
+      </div>
+    </div>`).join("");
 }
 
-function escHtml(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
-function copyUrl() {
-  navigator.clipboard?.writeText(RAW_URL).then(() => {
-    const t = document.getElementById("toast");
-    t.style.display = "block";
-    setTimeout(() => t.style.display = "none", 2500);
+function copyUrl(){
+  navigator.clipboard?.writeText(RAW_URL).then(()=>{
+    const t=document.getElementById("toast");
+    t.style.display="block"; setTimeout(()=>t.style.display="none",2500);
   });
 }
 
-// ── Filter buttons ─────────────────────────────────────────────────────────
-document.querySelectorAll(".filter-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    activeFilter = btn.dataset.filter;
-    applyFilterAndRender();
+document.querySelectorAll(".filt-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".filt-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active"); activeFilter=btn.dataset.filter; applyFilterAndRender();
   });
 });
-
-// ── Search ─────────────────────────────────────────────────────────────────
-document.getElementById("searchInput").addEventListener("input", e => {
-  searchQuery = e.target.value.toLowerCase().trim();
-  applyFilterAndRender();
+document.getElementById("searchInput").addEventListener("input",e=>{
+  searchQuery=e.target.value.toLowerCase().trim(); applyFilterAndRender();
 });
 
-// ── Init ───────────────────────────────────────────────────────────────────
 fetchData();
-// Auto-refresh every 5 minutes
-setInterval(fetchData, 5 * 60 * 1000);
+setInterval(fetchData,5*60*1000);
 </script>
 </body>
 </html>
