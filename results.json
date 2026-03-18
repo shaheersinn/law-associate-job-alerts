@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-03-18T08:34:09Z",
-  "total_all_time": 38,
-  "training_runs": 55,
+  "last_updated": "2026-03-18T12:14:32Z",
+  "total_all_time": 69,
+  "training_runs": 57,
   "score_threshold": 3,
   "runs": [
     {
@@ -894,482 +894,827 @@
       "threshold": 3,
       "source_breakdown": {},
       "jobs": []
+    },
+    {
+      "run_id": "20260318T121432Z",
+      "timestamp": "2026-03-18T12:14:32Z",
+      "jobs_found": 30,
+      "training_run": 57,
+      "threshold": 3,
+      "source_breakdown": {
+        "direct-html": 4,
+        "google-news": 15,
+        "jobspy": 11
+      },
+      "jobs": [
+        {
+          "TITLE": "Associate Positions",
+          "COMPANY": "Goldblattpartners",
+          "URL": "https://goldblattpartners.com/careers/associate-positions/",
+          "CATEGORY": "Associate",
+          "SCORE": 22,
+          "SOURCE": "direct-html",
+          "DATE": ""
+        },
+        {
+          "TITLE": "Summer Student Programs",
+          "COMPANY": "Chaitons",
+          "URL": "https://www.chaitons.com/careers/summer-student-programs",
+          "CATEGORY": "Student",
+          "SCORE": 12,
+          "SOURCE": "direct-html",
+          "DATE": ""
+        },
+        {
+          "TITLE": "Articling Student Programs",
+          "COMPANY": "Chaitons",
+          "URL": "https://www.chaitons.com/careers/articling-student-programs",
+          "CATEGORY": "Student",
+          "SCORE": 12,
+          "SOURCE": "direct-html",
+          "DATE": ""
+        },
+        {
+          "TITLE": "Confederation Life and Northumberland General Insurance: Representative Counsel",
+          "COMPANY": "Tgf",
+          "URL": "https://www.tgf.ca/expertise/representative-mandates/details/confederation-life-and-northumberland-general-insurance",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "direct-html",
+          "DATE": ""
+        },
+        {
+          "TITLE": "Employees Push Back on Returning to the Office: Employment Lawyer Mackenzie Irwin with CBC - Samfiru Tumarkin LLP",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMivgFBVV95cUxPbF9jZDZ3eFAxMU1TX1BneXdNeE9BdUlYbUNsUm0td2xOdVJlY1lXVklFRDh2WlR1b2tVQlozUXhNZTVzV1RVRU1nZXlIM2lfUE10eEpkazhaLTJIdV9sU3dkYVhycXBhMnQ3cU16Y3JEekNDcXJHd0RXTFN2Y2t3LWd1MWhCNUlrZFltMnlxRUUydExtaElGQ19lWW14Wl9wS0pybDVQRzhxSkRfWFpRVXdZV3NrTExvcUpDRjJ3?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Tue, 29 Ju"
+        },
+        {
+          "TITLE": "Justice for Sexually Harassed Toronto Worker: Employment Lawyer on HR Reporter - Samfiru Tumarkin LLP",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxObUNSX2hjVVhIYktON0RUcERVUm5KclVuRjRtQWphdEpSbThoTEZocS1JYW9fa0JTMmJyYnRiRXM3X09TRG5US0xRWnR3cDM0aUJoN2lMUUVHeEdZX3E1RUFkQnljb21va1lDQTVvclVvaVhYUDdSbmxzZ0docHRfNi1FOGNQTlFV?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Tue, 12 Au"
+        },
+        {
+          "TITLE": "Employment lawyer, CTV News, on Canadian bank employee rights amid downsizing - Samfiru Tumarkin LLP",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxQLTdSWTZQNGJKZGY3Z1dxVm1xX1hOT2FDWUhBTUxTNU91MmQxengyT3E1SWkxN2RSaU9hMjJUS0tKRC03U3FUbWdSekk0c0FQYkZZM0V6YUsxWnNHUDVSQWxCakoxbTRhSkg2NWZZUVVwaUszM1k1cUVSLWU0TEgyeFhhWXFEVDlEbTdLUHZYYVZlS3p1TEQxTWFkQkYwYUVQUDJtVjBxVlFCNkk?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Thu, 02 No"
+        },
+        {
+          "TITLE": "Job market worries ripple through legal sector after law firm layoffs and pay cuts on Bay Street - Canadian Lawyer Mag",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMi-wFBVV95cUxQMGlWMVVsOWxyZ0dRQVdkbHN1OWx6c2lWX2VnUWpSc1IySnZ0N2F6QldHQTJfa0V3NktzXzltMTlnWUFkUFdtd0JEUi1CVUNXSjJxdmcwdWU2a0M2NHBWbW8tRjNfQktBMUJKbVRITDFSQUo5WDJxNFhSa0xNaUVDZTZrbTEtTE5YQzdKaEF4Z1ZjdEpYd3lUUGV3cmtiRFdqV1BzWElJcGNKXy1iZzRMTzZ5VDRsTmNmVUhYUFJkNjFMaG94VTRxYXhWMEZLb2JKQzFhb2xHYnRDRTNVUE1qNVhiQ3FHLXdSX1FPdW5kQzJzLTd2VnVSM1RnZw?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Fri, 17 Ap"
+        },
+        {
+          "TITLE": "Employment lawyer on insurance industry layoffs in Canada - Samfiru Tumarkin LLP",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMikwFBVV95cUxOd3J0NXZMeHpfb0ZXT09mX3lNUVRJaTdyOFZ3SXptY1hjVjk0NlhET0MzT2ltd0Q2OGJ2TXpJQVFPZ2ZtT3F5d1pRZERhQlpORlhfY0V6bFluWjdtSFZHeC1lcm9NQklqaGtRenZBbzM0WXB1NEZzMW5SR1FTaTUwU1A1eDgxSDJlWWVZdGlRUVNHTzg?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Mon, 28 No"
+        },
+        {
+          "TITLE": "U.S. \u2018poaching\u2019 of Canadian associates on the upswing - Canadian Lawyer Mag",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMivAFBVV95cUxOazNuTGxvdUNzUWVIb3UzcEI4QVEwcHhlQ240UXRsVmJKVlJVR3FVUHFBN3FId3lDX2hqMmFIZlBtdnpHVUFQUE5zZHlpdmt0NnZPNzMzYzlJZVhCNmxCRGJsajktaEh4VUctNFpORXhIMlhaQnRncnpTdXE2cGY5S3lHWFVGbno3UUZIODl0cjZBdTJGZjFCYm4yU2ZHbnN5YVZsNmNSLWhNTE9FTHpuRndhRjhOQXJVQUF3VA?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Tue, 06 Ju"
+        },
+        {
+          "TITLE": "Lawyer contractors on the rise - Canadian Lawyer Mag",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMijgFBVV95cUxNekhjWW5oM2lwRUNRczM3MXU4NjFBckF2ZE1LczR4cWVCNkdfT00zZFc0LXdBU0pSbHAwV0owWW9LU0w1R1ZmOV9BUkxjbWd5ZGMwRWJSZHA0N1BRamRFczF1SE1nLWx0Q1VkenZmWE94TUZLdFBWemFCQVlCelU4TzVaRFJLY21mcElURW9n?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Mon, 11 De"
+        },
+        {
+          "TITLE": "Employment lawyer Greg Bush named partner at Miller Thomson in Toronto - HR Law Canada",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMipgFBVV95cUxNZDU5Vm11cHE2WG1EOWVWZnc3aUV3RkFjbHNVdEdFOV80dXoxY1FwZmp4ajRKN3J4YkVmZENFVkdFaENWMElTZi10dkJveDNXUXpDM0NWa1BtOU8wbUhfQWM1Y29tMm9yaU5vR3owUHQyTGFYbENYaVNMcVdoOEZ2NE91MC1OaHBqc0Q4Zm1iSmwtYjVvV1ZaSUItNEpJVGEzSEYzbHN3?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Thu, 19 Ja"
+        },
+        {
+          "TITLE": "Fixing articling needs to be a priority for the Law Society of Ontario - Canadian Lawyer Mag",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMiwgFBVV95cUxQbmozbEJNamo4a2cya0pzdXNMbmFxcEpET1dWQl9VVG5OZnVIbDU3Z1E0SGdOcVpzVnRtZm1rTjlLOUV5b194ZzlTbDRGN19Kd3YtMmpObHlUUk55NVQ5UGxncHVKeWFfNkxuSzBaNGNWQTJWTzJPT1ZTaDhVM0tLcnhYcllsTUhkOTh2aGxsMWhGQ0dkVHdMSXpFa1Naa2Z4N2NVb1NLRlhiRXg5blJab05jeWtWamd4bnJxa3kxelFpQQ?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Fri, 10 Fe"
+        },
+        {
+          "TITLE": "Will the conversation catalyzed by the Law Society of Ontario mean the end of articling? - Canadian Lawyer Mag",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMi6gFBVV95cUxNY0Z2MFRTTF92OVlBMUdNa2hDWlVqdHMyWWVxdDBhWmFjX1ZQVE1pRzgyY2M5QmZLVS16cm5JRjJEZS1kaUZhZFZHZ2x2dGZ1NjdObFRpS0tqbk4tUkVZTE5FMUZjaFN5SzBDWi1ubmR2V3MxcTlad29rSEdPZEs5VGtoN3ZmcDktczF4QjNZUUs2TmIyZHBReVZhMVVkLUdrVTJBbU02NHpkWTJRMHZmN3RwLWtELUF3alRYQ3N2aHBKMFV4Y2hsSlFGQTRieDNEZnVhdlhva2ZTNW9qckRqX3dvMEVsLXVZaGc?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Mon, 19 Au"
+        },
+        {
+          "TITLE": "What will Ontario do with more lawyers? - Canadian Lawyer Mag",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMiqAFBVV95cUxPbmJpcDVKYkNwWWF0X0YtSFFpeG4wXzBPWHpVb29MUlNWTzJlSjB3MkJ6OW9HYXRsd3k5dlJqSUlCYllJUktDTmlFNmJma0JpOVpjQnQ5SVNNUms0aGp0dUpueWlHdHk2Q3g4SjVOQkVOTzZGMUpfc3ktbGxONEdSNl83V19QWXByWGJUQ1gzYzk4VThFWEt6eWxKVmtwOUVueEtZN09RaEw?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Mon, 13 Au"
+        },
+        {
+          "TITLE": "Liu Holds Job Fair in Toronto, Hires New Lawyer to Help Her Acquire Hudson's Bay Company Leases - Connect CRE Canada",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMixwFBVV95cUxQbUVmbGlLY3d4WlFRaWpJN0FEQmxzbXcydXgwMlVxcFQ2ZFpFQ2FTM3JjRGF0Mk1UQ0RLSVNmMUN0NUVnV0FDdEtMYWlPWmQwNjVUazFwM3BXb0kyNTVkdE5rd0w1elAwNnd0T2ppYW1sdXFTRmhfNW1JN0c5LU5vMGtsNUNjdUx5eDVlUTlUX2t2bU5RTHJMXzJTWXNGTkhIRlBIUHBXV3E3ZnloeWV6OGlRZ2pEMjNxR0ZaZ3RtZFRRWjRjcmQ4?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Mon, 21 Ju"
+        },
+        {
+          "TITLE": "Toronto lawyer to help launch \u2018Neutral Zone\u2019 for separating spouses - Law Times News",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMitAFBVV95cUxNbDVDeEx2bktfQl9tX2QweDZvY0ZRbjVsdEdMQ2FZenlhZU4yb2V0SGtFLTY0X0lRS1pJb25XUU51cTQtQWpUREVJNE9QaDh4QlBBMzZ3bjBraHgxZ1R2a2dLN0Y3T3d2WEJMMTFHTTlKYWluZ1Nhb0t1U0lZdHBVbzNfY0F5ZFNTUVFtdkhISHVyOVBzYlh5cnd0eWJiWUpySzRxdEowMk5RNTRicUxlQmk4dkY?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Mon, 29 Au"
+        },
+        {
+          "TITLE": "Megan Savard for the Defence: Meet the lawyer representing a player at the centre of the Hockey Canada trial - Toronto Life",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOZHB5OVdpUUhJMHNxakNZZDBGb0lEMkk1dWc4Slh0TXItTDdMcElQNFNRMFRZZzN5cGtHSnNoRmFKZ1VSVVFvaWo5M216Z0NweVp3VFFDRlllT1kwY3VwRDFtOWg4ZmxhSENaNnZ2bW9xbWdJNTRiLVcxYXAyVHl6ZkhtMGJROWhiY3BDQzYwTmFDeVoyWUlITGJncGUtSW5IMDVpSlZwMTBsZw?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Tue, 20 Ma"
+        },
+        {
+          "TITLE": "Syncrude's In-House Counsel Relishes Role of Generalist - University of Alberta",
+          "COMPANY": "Google",
+          "URL": "https://news.google.com/rss/articles/CBMidkFVX3lxTE1yVkp0bC14UUpkNE1DSXB3V055RTNwcGR5dXV1X051ckZIZkJnZGZ1Qkx0bjFXQ1JmbXJFUTRaS3BSNHVyMGxmbXVLb2JxSU9jVzlQZjZEZmZBNjhTejhWVmtiNEp1MFNRbE12clRfTDVCNUJYRlE?oc=5",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "google-news",
+          "DATE": "Mon, 11 Ju"
+        },
+        {
+          "TITLE": "Lawyer \u2013 Insurance Defence (min. 3 yrs. experience)",
+          "COMPANY": "Kostyniuk & Greenside Lawyers",
+          "URL": "https://ca.indeed.com/viewjob?jk=7e5431b7c7bbe00a",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-16"
+        },
+        {
+          "TITLE": "Associate Lawyer",
+          "COMPANY": "EME Professional Corp",
+          "URL": "https://www.linkedin.com/jobs/view/4386394591",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-16"
+        },
+        {
+          "TITLE": "Associate Lawyer",
+          "COMPANY": "W3Global",
+          "URL": "https://www.linkedin.com/jobs/view/4384275319",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-13"
+        },
+        {
+          "TITLE": "Legal Counsel (12 months)",
+          "COMPANY": "Legal Aid Ontario",
+          "URL": "https://www.linkedin.com/jobs/view/4383278597",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-12"
+        },
+        {
+          "TITLE": "Future Opportunities: Lawyers & Legal Counsel - 2026",
+          "COMPANY": "The Mirillion Group",
+          "URL": "https://www.linkedin.com/jobs/view/4315209937",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-11"
+        },
+        {
+          "TITLE": "Corporate Legal Counsel",
+          "COMPANY": "ZSA Canada",
+          "URL": "https://www.linkedin.com/jobs/view/4385969627",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "jobspy",
+          "DATE": "nan"
+        },
+        {
+          "TITLE": "Not-For-Profit/Charity Lawyer",
+          "COMPANY": "ZSA Canada",
+          "URL": "https://www.linkedin.com/jobs/view/4385967775",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "nan"
+        },
+        {
+          "TITLE": "Legal Counsel I",
+          "COMPANY": "City of London, Canada",
+          "URL": "https://www.linkedin.com/jobs/view/4386947610",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "nan"
+        },
+        {
+          "TITLE": "Insurance Defence Lawyer",
+          "COMPANY": "ZSA Canada",
+          "URL": "https://www.linkedin.com/jobs/view/4385967784",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "nan"
+        },
+        {
+          "TITLE": "Associate Lawyer",
+          "COMPANY": "Chatwin LLP",
+          "URL": "https://www.linkedin.com/jobs/view/3927044096",
+          "CATEGORY": "Associate",
+          "SCORE": 18,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-13"
+        },
+        {
+          "TITLE": "Senior Manager & Team Lead, External Counsel Management",
+          "COMPANY": "RBC",
+          "URL": "https://www.linkedin.com/jobs/view/4385319590",
+          "CATEGORY": "Associate",
+          "SCORE": 20,
+          "SOURCE": "jobspy",
+          "DATE": "2026-03-13"
+        }
+      ]
     }
   ],
   "site_productivity": {
     "joinblakes": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "bennettjones": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "fasken": {
       "hits": 0,
-      "runs": 110,
+      "runs": 2,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 110
+      "consecutive_zeros": 2
     },
     "gowlingwlg": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "stikeman": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "dwpv": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "mccarthy": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "torys": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "goodmans": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "blg": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "millerthomson": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "cassels": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "airdberlis": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "osler": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "davies": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "litigate": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "wildlaw": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "weirfoulds": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "tgf": {
-      "hits": 10,
-      "runs": 55,
-      "rate": 0.182,
-      "last_hit": "2026-03-18T01:04:26Z",
-      "consecutive_zeros": 3
+      "hits": 1,
+      "runs": 1,
+      "rate": 1.0,
+      "last_hit": "2026-03-18T12:14:32Z",
+      "consecutive_zeros": 0
     },
     "blaney": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "foglers": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "singleton": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "paliareroland": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "cohenhighley": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "hicksmorley": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "glaholt": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "shibleyrighton": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "carters": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "cavalluzzo": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "goldblattpartners": {
       "hits": 1,
-      "runs": 55,
-      "rate": 0.018,
-      "last_hit": "2026-03-13T15:23:45Z",
-      "consecutive_zeros": 54
+      "runs": 1,
+      "rate": 1.0,
+      "last_hit": "2026-03-18T12:14:32Z",
+      "consecutive_zeros": 0
     },
     "siskinds": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "kmlaw": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "sotos": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "stockwoods": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "brauti": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "chaitons": {
       "hits": 1,
-      "runs": 55,
-      "rate": 0.018,
-      "last_hit": "2026-03-13T15:23:45Z",
-      "consecutive_zeros": 54
+      "runs": 1,
+      "rate": 1.0,
+      "last_hit": "2026-03-18T12:14:32Z",
+      "consecutive_zeros": 0
     },
     "lerners": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "hicksadams": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "fieldlaw": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "bdplaw": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "parlee": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "mross": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "brownleelaw": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "emeryjamieson": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "jmccormick": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "dentons": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "nortonrosefulbright": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "dlapiper": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
-    "careers": {
+    "bakermckenzie": {
       "hits": 0,
-      "runs": 275,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 275
+      "consecutive_zeros": 1
+    },
+    "herbertsmithfreehills": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "cliffordchance": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
     },
     "linklaters": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "zsa": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "thecounselnetwork": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "legaljobs": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "oba": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
-    "lawsociety": {
+    "ab": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "lso": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "cba": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
-    "jobs": {
+    "rbc": {
       "hits": 0,
-      "runs": 220,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 220
+      "consecutive_zeros": 1
+    },
+    "td": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
     },
     "sunlife": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
+    },
+    "manulife": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
     },
     "enbridge": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "suncor": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
+    },
+    "telus": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "bmo": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
+    },
+    "scotiabank": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
     },
     "cibc": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
     "ultravires": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
-    "osgoode": {
+    "yorku": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
     },
-    "ca": {
-      "hits": 5,
-      "runs": 275,
-      "rate": 0.018,
-      "last_hit": "2026-03-13T15:23:45Z",
-      "consecutive_zeros": 270
+    "indeed": {
+      "hits": 4,
+      "runs": 4,
+      "rate": 1.0,
+      "last_hit": "2026-03-18T12:14:32Z",
+      "consecutive_zeros": 0
     },
     "glassdoor": {
       "hits": 0,
-      "runs": 55,
+      "runs": 1,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 55
+      "consecutive_zeros": 1
+    },
+    "talent": {
+      "hits": 0,
+      "runs": 1,
+      "rate": 0.0,
+      "last_hit": null,
+      "consecutive_zeros": 1
     }
   },
   "source_stats": {
     "direct-html": {
-      "total_jobs": 12,
-      "total_runs": 11,
-      "avg_per_run": 1.09
+      "total_jobs": 17,
+      "total_runs": 13,
+      "avg_per_run": 1.31
     },
     "jobspy": {
-      "total_jobs": 26,
-      "total_runs": 9,
-      "avg_per_run": 2.89
+      "total_jobs": 37,
+      "total_runs": 10,
+      "avg_per_run": 3.7
+    },
+    "google-news": {
+      "total_jobs": 15,
+      "total_runs": 1,
+      "avg_per_run": 15.0
     }
   }
 }
