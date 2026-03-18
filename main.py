@@ -1,51 +1,42 @@
 #!/usr/bin/env python3
-"""
-Law Associate Job Scraper — v6 (Live-Log Bug-Fix Edition)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-BUGS FIXED vs v5 (confirmed from 2026-03-11 live-log analysis):
-
-DEAD DOMAINS REMOVED (confirmed dead in 2026-03-11 logs):
-  ✓ www.davies.ca         → SSL cert mismatch (hostname). Fixed → davies.ca
-  ✓ www.gutierrezlaw.ca   → DNS dead (NameResolutionError)
-  ✓ sookermacleod.com     → DNS dead (NameResolutionError)
-  ✓ www.mustardlaw.ca     → DNS dead (NameResolutionError)
-  ✓ www.burntsand.com     → ConnectTimeoutError (12s)
-  ✓ careers.oba.org       → ReadTimeoutError. Fixed → www.oba.org/Careers
-
-FALSE POSITIVES BLOCKED (confirmed from 2026-03-11 live output):
-  ✓ "Summer CPA Articling Student, Assurance and Accounting" × 2
-    → CPA = Chartered Professional Accountant; not law.
-    Fix: RE_BLOCKED_TITLE gains r"\bcpa\s+articling\b"
-  ✓ "Flextronics Corporation: Counsel to Flextronics during the CCAA..."
-    → TGF past-matter description page, NOT a job posting.
-    Fix: RE_CASE_DESCRIPTION blocks "Counsel to [Org]" + CCAA/matter patterns
-  ✓ "Expert Opportunity - Lawyer ($225/hr up to $4.5k/week)"
-    → Freelance expert-witness gig, NOT a law-firm associate role.
-    Fix: RE_FREELANCE blocks hourly-rate and expert-opportunity patterns.
-
-WORKFLOW BUG (dashboard never updated):
-  ✓ Old job_alert.yml had NO `git commit` step and NO `permissions: write`.
-    results.json was written to runner disk but never pushed to the repo, so
-    the Vercel dashboard read a permanently empty file.
-    Fix: new job_alert.yml (v4 actions, separate restore/save, git-commit step).
-
-TELEGRAM:
-  ✓ Multi-chunk messages sent as separate API calls could flood the chat.
-    Fix: build the full message first, then send in one HTTP POST (Telegram
-    supports up to 4096 chars per message). If total > 4096, we trim the
-    job list to fit, appending a "… and N more" footer rather than splitting.
-
-MODEL IMPROVEMENTS:
-  + Dead-domain self-learning: domains that produce 0 jobs over 5+ consecutive
-    runs are logged to weights["low_productivity_domains"] and skipped on the
-    next scrape, removing them automatically.
-  + Source reliability matrix: per-source precision estimate tracks how many
-    hits each source produces per run.
-  + Enhanced junior signals: new regex catches "0-2 PQE", "PQE 0-2",
-    "newly admitted", "fresh call" patterns.
-  + Threshold floor/ceiling tightened (3–10 instead of 3–12) to reduce both
-    false positives and false negatives.
-"""
+# Law Associate Job Scraper -- v9 (LLM Experience Filter)
+# ---------------------------------------------------------
+# CHANGES vs v7:
+#
+# CRITICAL FIXES:
+#   - model_weights site_productivity fully reset (all 55-run data was poisoned
+#     by the domain-key bug; retaining it would suppress all major Bay St firms)
+#   - TRUSTED_CA_DOMAINS are now IMMUNE to auto-pruning — always scanned
+#   - DEAD_DOMAIN_THRESHOLD raised 5 → 15 (5 was far too aggressive)
+#   - History expiry: URLs older than HISTORY_TTL_DAYS are re-evaluated
+#
+# NEW SOURCES (+4 scrapers):
+#   - Google News RSS  — law job articles, no auth, extremely reliable
+#   - Indeed RSS       — indeed.com/rss job feeds per search term + location
+#   - Google Alerts RSS — user-configured alerts piped into scraper
+#   - ZSA / Counsel Network direct scrapers — Canada's top legal recruiters
+#
+# ATS IMPROVEMENTS:
+#   - Workday: now tries wd1/wd3/wd5 host variants with correct JSON payload
+#   - Greenhouse: added 8 new boards (Shopify, OMERS, Intact, Brookfield...)
+#   - Lever: added 5 new boards
+#   - iCIMS: tightened search; now uses legal-specific category filter
+#
+# SCORING IMPROVEMENTS:
+#   - Recruiter/agency source gets +2 bonus (more likely to be real openings)
+#   - "Newly called" and "0-3 years" get +3 each (was +4 combined)
+#   - Trusted-domain jobs skip the location check entirely (they're already CA)
+#   - Added "junior associate" as explicit high-value signal (+5)
+#
+# DEDUPLICATION:
+#   - URL-level dedup now strips UTM params and tracking tokens
+#   - Title similarity check: near-identical titles from same company merged
+#
+# TELEGRAM:
+#   - Jobs now sorted by SCORE descending
+#   - Score shown as star rating (1-5 stars) instead of raw number
+#   - "🆕 New firm!" badge when a TRUSTED firm appears for the first time
+#   - Batch send: one message per category (Associates / Students) if > 4096 chars
 
 from __future__ import annotations
 
@@ -53,11 +44,12 @@ import os
 import re
 import json
 import time
+import hashlib
 import logging
 import concurrent.futures
-from urllib.parse import urljoin, urlparse
-from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
+from typing import List, Dict, Any, Optional, Set
+from urllib.parse import urljoin, urlparse, urlencode, parse_qs, urlunparse
 
 import pandas as pd
 import requests
@@ -69,6 +61,17 @@ try:
     from jobspy import scrape_jobs
 except ImportError:
     scrape_jobs = None
+
+try:
+    import base64
+    from email import message_from_bytes
+    from google.auth.transport.requests import Request as GRequest
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build as gbuild
+    _GMAIL_AVAILABLE = True
+except ImportError:
+    _GMAIL_AVAILABLE = False
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -91,31 +94,30 @@ _HEADERS = {
     "Connection":      "keep-alive",
 }
 
-HISTORY_FILE   = os.environ.get("HISTORY_FILE",   "job_history.json")
-WEIGHTS_FILE   = os.environ.get("WEIGHTS_FILE",   "model_weights.json")
-RESULTS_FILE   = os.environ.get("RESULTS_FILE",   "results.json")
-RESULTS_WANTED = int(os.environ.get("RESULTS_WANTED") or "30")
-DASHBOARD_URL  = os.environ.get("DASHBOARD_URL",  "https://law-associate-job-alerts.vercel.app/")
+HISTORY_FILE      = os.environ.get("HISTORY_FILE",   "job_history.json")
+WEIGHTS_FILE      = os.environ.get("WEIGHTS_FILE",   "model_weights.json")
+RESULTS_FILE      = os.environ.get("RESULTS_FILE",   "results.json")
+LLM_CACHE_FILE    = os.environ.get("LLM_CACHE_FILE", "llm_cache.json")
+RESULTS_WANTED    = int(os.environ.get("RESULTS_WANTED") or "30")
+DASHBOARD_URL     = os.environ.get("DASHBOARD_URL",  "https://law-associate-job-alerts.vercel.app/")
+HISTORY_TTL_DAYS  = int(os.environ.get("HISTORY_TTL_DAYS") or "60")   # re-check URLs after N days
 
-MIN_TITLE_LENGTH = 15
-# How many consecutive zero-hit runs before a domain is soft-disabled
-DEAD_DOMAIN_THRESHOLD = 5
+MIN_TITLE_LENGTH      = 15
+DEAD_DOMAIN_THRESHOLD = 15   # v8: raised from 5 — 5 was far too aggressive
 
-BLOCKED_DOMAINS = {
+BLOCKED_DOMAINS: Set[str] = {
     "emond",           # Legal publisher (textbooks), NOT a law firm
     "legaljobsboard",  # Dead / timeout
 }
 
-# Domains with SSL certificate mismatches — use verify=False as fallback.
-SSL_SOFT_DOMAINS = {
+SSL_SOFT_DOMAINS: Set[str] = {
     "hicks.ca",
     "mcleodlaw.com",
-    # BUG FIX: davies.ca cert is valid but NOT for www.davies.ca — use bare domain
     "davies.ca",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. COMPILED REGEX
+# 2. REGEX
 # ─────────────────────────────────────────────────────────────────────────────
 
 RE_ASSOCIATE = re.compile(
@@ -127,7 +129,6 @@ RE_STUDENT = re.compile(
     r"law\s+student|student[-\s]at[-\s]law|stagiaire)\b",
     re.IGNORECASE,
 )
-
 RE_NAV_LINK_EXACT = re.compile(
     r"^(our\s+team|profiles?|meet\s+our\s+team|join\s+us|who\s+we\s+are|about\s+us|"
     r"attorney\s+advertising|terms\s+of\s+use|privacy\s+policy|site\s+map|"
@@ -136,7 +137,6 @@ RE_NAV_LINK_EXACT = re.compile(
     r"read\s+more|learn\s+more|click\s+here|home|menu|search)$",
     re.IGNORECASE,
 )
-
 RE_BLOCKED_TITLE = re.compile(
     r"\b(senior\s+associate|senior\s+counsel|senior\s+lawyer|"
     r"managing\s+partner|equity\s+partner|non[-\s]equity\s+partner|"
@@ -151,15 +151,11 @@ RE_BLOCKED_TITLE = re.compile(
     r"shop\s+all|shop\s+our|bursary|scholarship|award|prize|"
     r"course\s+outline|study\s+guide|bar\s+exam|"
     r"subscribe|newsletter|podcast|webinar|"
-    # BUG FIX: CPA = Chartered Professional Accountant, NOT a law articling student
     r"cpa\s+articling|cpa\s+student|co-op\s+cpa|co\s+op\s+cpa|"
     r"assurance\s+and\s+accounting|tax\s+articling|"
-    # BUG FIX: "counsel to [company]" = past-matter description (e.g. TGF website)
     r"counsel\s+to\s+(?:the\s+)?(?:\w+\s+){0,4}(?:during|in\s+the|on\s+the|regarding))\b",
     re.IGNORECASE,
 )
-
-# BUG FIX: Block freelance / expert-witness / contract listings with hourly rates
 RE_FREELANCE = re.compile(
     r"(\$\d+[\,\d]*\s*/\s*(?:hr|hour)|"
     r"\bexpert\s+opportunity\b|"
@@ -169,20 +165,16 @@ RE_FREELANCE = re.compile(
     r"\bexpert\s+witness\b)",
     re.IGNORECASE,
 )
-
-# BUG FIX: Catch ordinal-year seniority in titles.
 RE_YEAR_TOO_SENIOR = re.compile(
     r"\b(third|fourth|fifth|sixth|seventh|3rd|4th|5th|6th|7th)\s+year\b",
     re.IGNORECASE,
 )
-
 RE_BAD_URLS = re.compile(
     r"(/who-we-are/|/our-team/|/profiles/|/people/|/attorney-advertising|"
     r"/student-programs/|/summer-program|/blog/|/news/|/events/|/insights/|"
     r"\.(pdf|jpg|png|gif|zip)$)",
     re.IGNORECASE,
 )
-
 RE_EXP_KILLER = re.compile(
     r"\b((?:minimum|at\s+least|over|more\s+than)\s+)?(4|5|6|7|8|9|10)(\+|\s*[-–]\s*\d+)?\s*years",
     re.IGNORECASE,
@@ -191,8 +183,6 @@ RE_SENIOR_ROLE = re.compile(
     r"\b(senior|mid[-\s]level|intermediate|experienced)\s+(associate|counsel|lawyer|attorney)\b",
     re.IGNORECASE,
 )
-
-# Enhanced junior signals — now also catches PQE variants
 RE_JUNIOR_SIGNALS = re.compile(
     r"\b(newly\s+called|new\s+call|recent\s+call|newly\s+admitted|fresh\s+call|"
     r"0[-–]2\s+years?|1[-–]3\s+years?|0[-–]3\s+years?|"
@@ -230,6 +220,7 @@ RE_BAD_LOCATIONS = re.compile(
     re.IGNORECASE,
 )
 
+# v8: canonical set — used in immune-from-pruning check AND scoring trust bonus
 TRUSTED_CA_DOMAINS = {
     "blakes", "bennettjones", "fasken", "gowlingwlg", "stikeman", "dwpv",
     "mccarthy", "torys", "goodmans", "blg", "millerthomson", "cassels",
@@ -240,15 +231,44 @@ TRUSTED_CA_DOMAINS = {
     "cohenhighley", "brauti", "singleton", "glaholt",
     "shibleyrighton", "carters", "mross", "legalaidontario",
     "siskinds", "litigate", "wildlaw", "kmlaw", "sotos",
+    "joinblakes", "blakescareers",   # Blake's ATS subdomains
+    "chaitons", "lerners", "hicksadams",
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1b. DOMAIN KEY HELPER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _domain_key(url: str) -> str:
+    """Return the registrable-domain label (parts[-2]) for any URL.
+
+    careers.bakermckenzie.com -> bakermckenzie
+    ca.indeed.com             -> indeed
+    jobs.rbc.com              -> rbc
+    joinblakes.com            -> joinblakes
+    """
+    netloc = urlparse(url).netloc.lower().replace("www.", "")
+    parts  = netloc.split(".")
+    return parts[-2] if len(parts) >= 2 else (parts[0] if parts else "")
+
+
+def _strip_tracking(url: str) -> str:
+    """Remove UTM/tracking params so two URLs pointing to the same job dedup correctly."""
+    tracking = {"utm_source","utm_medium","utm_campaign","utm_term","utm_content",
+                "ref","referer","source","trk","trkinfo","mc_cid","mc_eid",
+                "fbclid","gclid","li_fat_id","clickid"}
+    parsed = urlparse(url)
+    qs = {k: v for k, v in parse_qs(parsed.query).items() if k.lower() not in tracking}
+    clean_query = urlencode(qs, doseq=True)
+    return urlunparse(parsed._replace(query=clean_query, fragment=""))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. ADAPTIVE MODEL WEIGHTS (SELF-TRAINING)
+# 3. ADAPTIVE MODEL WEIGHTS
 # ─────────────────────────────────────────────────────────────────────────────
 
 DEFAULT_WEIGHTS: Dict[str, Any] = {
-    "version":         6,
+    "version":         8,
     "training_runs":   0,
     "last_trained":    None,
     "score_threshold": 5,
@@ -259,10 +279,11 @@ DEFAULT_WEIGHTS: Dict[str, Any] = {
     },
     "site_productivity":        {},
     "source_stats":             {},
-    "low_productivity_domains": [],   # self-pruned dead domains
+    "low_productivity_domains": [],
     "run_history":              [],
     "total_jobs_found":         0,
     "false_positive_domains":   [],
+    "first_seen_domains":       [],   # v8: track which trusted domains have ever hit
 }
 
 
@@ -274,6 +295,19 @@ def load_weights() -> Dict[str, Any]:
             for k, v in DEFAULT_WEIGHTS.items():
                 if k not in data:
                     data[k] = v
+            # v8: if site_productivity has 0-hit entries for TRUSTED domains with
+            # many runs, reset it entirely — it's poisoned from the domain-key bug.
+            sp = data.get("site_productivity", {})
+            trusted_zero = sum(
+                1 for k, v in sp.items()
+                if k in TRUSTED_CA_DOMAINS and v.get("hits", 0) == 0 and v.get("runs", 0) >= 5
+            )
+            if trusted_zero > 3:
+                log.warning(
+                    f"[Weights] Detected {trusted_zero} trusted domains with 0 hits — "
+                    "site_productivity data is corrupted; resetting."
+                )
+                data["site_productivity"] = {}
             return data
         except Exception as e:
             log.warning(f"Could not load weights: {e}. Using defaults.")
@@ -294,68 +328,50 @@ def train_model(
     sites_scanned: List[str],
     run_timestamp: str,
 ) -> Dict[str, Any]:
-    """
-    Update model weights based on this run's results.
-
-    Enhancements in v6:
-    - Dead-domain self-pruning: domains with 0 hits over DEAD_DOMAIN_THRESHOLD
-      consecutive runs are added to low_productivity_domains for future skipping.
-    - Source reliability: tracks avg jobs/run per source for dashboard display.
-    - Threshold is clamped to [3, 10] (was [3, 12]) to avoid extreme drift.
-    """
-    hit_domains:   set = set()
+    hit_domains:   Set[str]      = set()
     source_counts: Dict[str, int] = {}
 
     for job in jobs_found:
-        try:
-            domain = urlparse(job.get("URL", "")).netloc.replace("www.", "")
-            hit_domains.add(domain.split(".")[0].lower())
-        except Exception:
-            pass
-        source = job.get("SOURCE", "unknown")
-        source_counts[source] = source_counts.get(source, 0) + 1
+        hit_domains.add(_domain_key(job.get("URL", "")))
+        src = job.get("SOURCE", "unknown")
+        source_counts[src] = source_counts.get(src, 0) + 1
 
-    # ── Site productivity tracking + dead-domain pruning ──────────────────
-    scanned_keys = set()
+    # ── Site productivity ────────────────────────────────────────────────
     for site_url in sites_scanned:
-        try:
-            domain    = urlparse(site_url).netloc.replace("www.", "")
-            key       = domain.split(".")[0].lower()
-            scanned_keys.add(key)
-            entry = weights["site_productivity"].setdefault(
-                key, {"hits": 0, "runs": 0, "rate": 0.0,
-                      "last_hit": None, "consecutive_zeros": 0}
-            )
-            entry["runs"] += 1
-            if key in hit_domains:
-                entry["hits"]              += 1
-                entry["last_hit"]           = run_timestamp
-                entry["consecutive_zeros"]  = 0
-            else:
-                entry["consecutive_zeros"]  = entry.get("consecutive_zeros", 0) + 1
-            entry["rate"] = round(entry["hits"] / max(entry["runs"], 1), 3)
+        key   = _domain_key(site_url)
+        entry = weights["site_productivity"].setdefault(
+            key, {"hits": 0, "runs": 0, "rate": 0.0,
+                  "last_hit": None, "consecutive_zeros": 0}
+        )
+        entry["runs"] += 1
+        if key in hit_domains:
+            entry["hits"]             += 1
+            entry["last_hit"]          = run_timestamp
+            entry["consecutive_zeros"] = 0
+        else:
+            entry["consecutive_zeros"] = entry.get("consecutive_zeros", 0) + 1
+        entry["rate"] = round(entry["hits"] / max(entry["runs"], 1), 3)
 
-            # Self-prune domains that have never produced results
-            dead = weights.setdefault("low_productivity_domains", [])
-            if (entry["consecutive_zeros"] >= DEAD_DOMAIN_THRESHOLD
-                    and key not in TRUSTED_CA_DOMAINS
-                    and key not in hit_domains
-                    and key not in dead):
-                dead.append(key)
-                log.info(f"[Train] Auto-pruning low-productivity domain: {key}")
-        except Exception:
-            pass
+        # v8: TRUSTED domains are IMMUNE from auto-pruning
+        dead = weights.setdefault("low_productivity_domains", [])
+        if (
+            key not in TRUSTED_CA_DOMAINS          # never prune trusted firms
+            and key not in BLOCKED_DOMAINS
+            and key not in hit_domains
+            and entry["consecutive_zeros"] >= DEAD_DOMAIN_THRESHOLD
+            and key not in dead
+        ):
+            dead.append(key)
+            log.info(f"[Train] Auto-pruning low-productivity domain: {key}")
 
-    # ── Per-source stats ───────────────────────────────────────────────────
+    # ── Per-source stats ─────────────────────────────────────────────────
     for src, cnt in source_counts.items():
         entry = weights["source_stats"].setdefault(
             src, {"total_jobs": 0, "total_runs": 0, "avg_per_run": 0.0}
         )
         entry["total_jobs"] += cnt
         entry["total_runs"] += 1
-        entry["avg_per_run"] = round(
-            entry["total_jobs"] / max(entry["total_runs"], 1), 2
-        )
+        entry["avg_per_run"] = round(entry["total_jobs"] / max(entry["total_runs"], 1), 2)
 
     # ── Adaptive threshold (clamped 3–10) ────────────────────────────────
     n         = len(jobs_found)
@@ -375,6 +391,13 @@ def train_model(
         for word in kw:
             if word in title:
                 kw[word] = min(kw[word] + 1, 20)
+
+    # ── v8: Track first-seen trusted domains (for Telegram badge) ────────
+    first_seen = weights.setdefault("first_seen_domains", [])
+    for domain in hit_domains:
+        if domain in TRUSTED_CA_DOMAINS and domain not in first_seen:
+            first_seen.append(domain)
+            log.info(f"[Train] New trusted domain first hit: {domain}")
 
     summary = {
         "timestamp":        run_timestamp,
@@ -397,14 +420,14 @@ def train_model(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. JOB SCORER  (v6 — with additional false-positive blocks)
+# 4. JOB SCORER
 # ─────────────────────────────────────────────────────────────────────────────
 
 class JobScorer:
     def __init__(self, weights: Dict[str, Any]):
-        self.threshold       = weights.get("score_threshold", 5)
-        self.kw              = weights.get("keyword_weights", DEFAULT_WEIGHTS["keyword_weights"])
-        self.dead_domains    = set(weights.get("low_productivity_domains", []))
+        self.threshold    = weights.get("score_threshold", 5)
+        self.kw           = weights.get("keyword_weights", DEFAULT_WEIGHTS["keyword_weights"])
+        self.dead_domains = set(weights.get("low_productivity_domains", []))
 
     def score_job(
         self,
@@ -418,41 +441,34 @@ class JobScorer:
         url_l     = str(url).lower()
         full_text = (title + " " + desc + " " + company).lower()
 
-        # ── A. Fast-fail checks ────────────────────────────────────────────
-
         if len(title) < MIN_TITLE_LENGTH:
             return False, "Too Short", -100
 
-        domain_key = urlparse(url).netloc.replace("www.", "").split(".")[0].lower()
+        domain_key = _domain_key(url)
 
         if domain_key in BLOCKED_DOMAINS:
             return False, "Blocked Domain", -100
 
-        # Self-trained dead-domain pruning
-        if domain_key in self.dead_domains and domain_key not in TRUSTED_CA_DOMAINS:
+        # TRUSTED domains are never dead-domain blocked
+        if domain_key not in TRUSTED_CA_DOMAINS and domain_key in self.dead_domains:
             return False, "Low Productivity Domain", -100
 
         if RE_NAV_LINK_EXACT.match(title.strip()):
             return False, "Nav Link", -100
         if RE_BAD_URLS.search(url_l):
             return False, "Bad URL", -100
-
         if RE_BLOCKED_TITLE.search(title):
             return False, "Blocked Title", -100
         if RE_YEAR_TOO_SENIOR.search(title):
             return False, "Year Too Senior", -100
-
-        # BUG FIX: Block freelance / expert-witness / hourly-rate listings
         if RE_FREELANCE.search(title):
             return False, "Freelance/Contract", -100
-
         if RE_EXP_KILLER.search(full_text) or RE_SENIOR_ROLE.search(full_text):
             return False, "Too Senior", -100
-
         if RE_BAD_LOCATIONS.search(title):
             return False, "Wrong Location (title)", -100
 
-        # ── B. Categorise ─────────────────────────────────────────────────
+        # Categorise
         category = "Unknown"
         score    = 0
         if RE_ASSOCIATE.search(title):
@@ -464,14 +480,16 @@ class JobScorer:
         else:
             return False, "Not Legal", -100
 
-        # ── C. Location check ─────────────────────────────────────────────
+        # Location check — TRUSTED domains skip this
         if domain_key not in TRUSTED_CA_DOMAINS:
             if RE_BAD_LOCATIONS.search(full_text):
                 return False, "Wrong Location", -100
             if not RE_LOCATIONS.search(full_text):
                 return False, "No ON/AB Location", -100
+        else:
+            score += 2   # trusted-domain bonus
 
-        # ── D. Content signals ────────────────────────────────────────────
+        # Content signals
         if desc and len(desc) > 100:
             if any(kw in full_text for kw in ["apply", "resume", "contact", "submit", "application"]):
                 score += 2
@@ -490,9 +508,7 @@ class JobScorer:
 def get_session(verify_ssl: bool = True) -> requests.Session:
     s     = requests.Session()
     retry = Retry(
-        total=2,
-        connect=1,
-        read=1,
+        total=2, connect=1, read=1,
         backoff_factor=1.0,
         status_forcelist=[429, 500, 502, 503, 504],
     )
@@ -517,14 +533,18 @@ def safe_get(
     timeout:    int  = 12,
     verify_ssl: bool = True,
 ) -> Optional[requests.Response]:
+    hostname = urlparse(url).netloc.replace("www.", "")
+    if hostname in SSL_SOFT_DOMAINS or any(d in hostname for d in SSL_SOFT_DOMAINS):
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        verify_ssl = False
+
     try:
         resp = session.get(url, timeout=timeout, verify=verify_ssl)
         if resp.status_code == 200:
             return resp
     except requests.exceptions.SSLError:
-        hostname = urlparse(url).netloc.replace("www.", "")
-        if hostname in SSL_SOFT_DOMAINS or any(d in hostname for d in SSL_SOFT_DOMAINS):
-            log.debug(f"SSL cert mismatch for {hostname}, retrying with verify=False")
+        if verify_ssl:
             try:
                 import urllib3
                 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -547,7 +567,7 @@ def scrape_site_html(url: str, scorer: JobScorer) -> List[dict]:
     found_jobs: List[dict] = []
     visited    = set()
     queue      = [url]
-    domain     = urlparse(url).netloc.replace("www.", "")
+    domain     = _domain_key(url)
     MAX_PAGES  = 3
 
     while queue and MAX_PAGES > 0:
@@ -588,7 +608,7 @@ def scrape_site_html(url: str, scorer: JobScorer) -> List[dict]:
                     if is_fit:
                         found_jobs.append({
                             "TITLE":    text,
-                            "COMPANY":  domain.split(".")[0].title(),
+                            "COMPANY":  domain.title(),
                             "URL":      href,
                             "CATEGORY": cat,
                             "SCORE":    score,
@@ -615,27 +635,21 @@ def _is_law_job(title: str, dept: str = "", loc: str = "") -> bool:
 
 def _is_on_ab(location: str) -> bool:
     if not location:
-        return True  # assume Canada if blank
+        return True
     if RE_BAD_LOCATIONS.search(location):
         return False
     return True
 
 
 # ── 7a. Workday ──────────────────────────────────────────────────────────────
-# These are the most reliably confirmed Workday endpoints for Canada.
-# Tenant slugs must match exactly. If a tenant returns 0 the self-training
-# system will eventually auto-prune it.
 
 WORKDAY_TENANTS = [
-    # (tenant_slug, board_slug, company_display_name)
     ("fasken",           "Fasken_Careers",           "Fasken"),
     ("millerthomson",    "MillerThomson",             "Miller Thomson"),
     ("osler",            "Osler_External",            "Osler"),
-    ("mccarthy",         "McCarthyTetrault",          "McCarthy Tétrault"),
+    ("mccarthy",         "McCarthyTetrault",          "McCarthy Tetrault"),
     ("legalaidontario",  "LegalAidOntario",           "Legal Aid Ontario"),
-    # Ontario Public Service — confirmed slug
     ("ontario",          "OPS_External_site",         "Ontario Public Service"),
-    # In-house legal
     ("rbc",              "RBCCareers",                "RBC"),
     ("td",               "TDBank",                   "TD Bank"),
     ("manulife",         "MFCGJ_Careers",            "Manulife"),
@@ -645,24 +659,33 @@ WORKDAY_TENANTS = [
     ("sunlife",          "SunLifeCareers",            "Sun Life"),
     ("scotiabank",       "Scotiabank_Careers",        "Scotiabank"),
     ("cibc",             "CIBC_External",             "CIBC"),
+    ("bmo",              "BMO_Careers",               "BMO"),
 ]
 
+# v8: try all three Workday host variants before giving up
+_WD_HOSTS = ["wd3", "wd1", "wd5"]
 
 def scrape_workday_tenant(tenant: str, board: str, company: str, scorer: JobScorer) -> List[dict]:
     session = get_session()
     results = []
-    for wd_host in [f"{tenant}.wd3.myworkdayjobs.com", f"{tenant}.wd1.myworkdayjobs.com"]:
+    for variant in _WD_HOSTS:
+        wd_host = f"{tenant}.{variant}.myworkdayjobs.com"
         url     = f"https://{wd_host}/wday/cxs/{tenant}/{board}/jobs"
-        payload = {"limit": 20, "offset": 0, "searchText": "associate lawyer counsel articling"}
+        payload = {
+            "limit": 20, "offset": 0,
+            "searchText": "associate lawyer counsel articling",
+        }
         try:
-            resp = session.post(url, json=payload, timeout=15,
-                                headers={**_HEADERS, "Content-Type": "application/json"})
+            resp = session.post(
+                url, json=payload, timeout=15,
+                headers={**_HEADERS, "Content-Type": "application/json"},
+            )
             if resp.status_code != 200:
                 continue
             data = resp.json()
             jobs = data.get("jobPostings", [])
             if not jobs:
-                continue
+                break  # valid response but no jobs — don't try other variants
 
             for job in jobs:
                 title    = job.get("title", "")
@@ -689,7 +712,7 @@ def scrape_workday_tenant(tenant: str, board: str, company: str, scorer: JobScor
                     })
             break
         except Exception as e:
-            log.debug(f"Workday {tenant} ({wd_host}): {e}")
+            log.debug(f"Workday {tenant} ({variant}): {e}")
 
     return results
 
@@ -698,10 +721,7 @@ def scrape_all_workday(scorer: JobScorer) -> List[dict]:
     log.info(f"  [Workday] Scanning {len(WORKDAY_TENANTS)} tenants...")
     all_jobs: List[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
-        futures = {
-            ex.submit(scrape_workday_tenant, t, b, c, scorer): c
-            for t, b, c in WORKDAY_TENANTS
-        }
+        futures = {ex.submit(scrape_workday_tenant, t, b, c, scorer): c for t, b, c in WORKDAY_TENANTS}
         for f in concurrent.futures.as_completed(futures):
             try:
                 all_jobs.extend(f.result())
@@ -713,6 +733,7 @@ def scrape_all_workday(scorer: JobScorer) -> List[dict]:
 # ── 7b. Greenhouse ────────────────────────────────────────────────────────────
 
 GREENHOUSE_BOARDS = [
+    # Law firms
     ("omers",               "OMERS Legal"),
     ("brookfieldrenewable", "Brookfield Renewable"),
     ("telus",               "Telus Legal"),
@@ -727,6 +748,15 @@ GREENHOUSE_BOARDS = [
     ("lightspeed",          "Lightspeed Legal"),
     ("hootsuite",           "Hootsuite Legal"),
     ("clio",                "Clio Legal"),
+    # v8: added boards
+    ("torontodominion",     "TD Legal"),
+    ("intact",              "Intact Legal"),
+    ("brookfieldrealestate","Brookfield Real Estate Legal"),
+    ("opentext",            "OpenText Legal"),
+    ("kinaxis",             "Kinaxis Legal"),
+    ("d2l",                 "D2L Legal"),
+    ("securekey",           "SecureKey Legal"),
+    ("pivotal",             "Pivotal Legal"),
 ]
 
 
@@ -775,10 +805,7 @@ def scrape_all_greenhouse(scorer: JobScorer) -> List[dict]:
     log.info(f"  [Greenhouse] Scanning {len(GREENHOUSE_BOARDS)} boards...")
     all_jobs: List[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
-        futures = {
-            ex.submit(scrape_greenhouse_board, s, c, scorer): c
-            for s, c in GREENHOUSE_BOARDS
-        }
+        futures = {ex.submit(scrape_greenhouse_board, s, c, scorer): c for s, c in GREENHOUSE_BOARDS}
         for f in concurrent.futures.as_completed(futures):
             try:
                 all_jobs.extend(f.result())
@@ -790,15 +817,21 @@ def scrape_all_greenhouse(scorer: JobScorer) -> List[dict]:
 # ── 7c. Lever ────────────────────────────────────────────────────────────────
 
 LEVER_BOARDS = [
-    ("goodmans",           "Goodmans LLP"),
-    ("cavalluzzo",         "Cavalluzzo LLP"),
-    ("siskinds",           "Siskinds LLP"),
-    ("weirfoulds",         "Weirfoulds LLP"),
-    ("shopify",            "Shopify Legal"),
-    ("lightspeed",         "Lightspeed Legal"),
-    ("clio",               "Clio Legal"),
-    ("d2l",                "D2L Legal"),
-    ("hootsuite",          "Hootsuite Legal"),
+    ("goodmans",        "Goodmans LLP"),
+    ("cavalluzzo",      "Cavalluzzo LLP"),
+    ("siskinds",        "Siskinds LLP"),
+    ("weirfoulds",      "Weirfoulds LLP"),
+    ("shopify",         "Shopify Legal"),
+    ("lightspeed",      "Lightspeed Legal"),
+    ("clio",            "Clio Legal"),
+    ("d2l",             "D2L Legal"),
+    ("hootsuite",       "Hootsuite Legal"),
+    # v8: added
+    ("benchsci",        "BenchSci Legal"),
+    ("dossier",         "Dossier Legal"),
+    ("ecobee",          "ecobee Legal"),
+    ("tulip",           "Tulip Legal"),
+    ("ratehub",         "Ratehub Legal"),
 ]
 
 
@@ -824,7 +857,7 @@ def scrape_lever_board(slug: str, company: str, scorer: JobScorer) -> List[dict]
                 s.get("content", "") for s in job.get("descriptionBody", {}).get("blocks", [])
                 if isinstance(s, dict)
             )
-            posted   = datetime.fromtimestamp(
+            posted = datetime.fromtimestamp(
                 job.get("createdAt", 0) / 1000, tz=timezone.utc
             ).strftime("%Y-%m-%d") if job.get("createdAt") else ""
 
@@ -854,10 +887,7 @@ def scrape_all_lever(scorer: JobScorer) -> List[dict]:
     log.info(f"  [Lever] Scanning {len(LEVER_BOARDS)} boards...")
     all_jobs: List[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
-        futures = {
-            ex.submit(scrape_lever_board, s, c, scorer): c
-            for s, c in LEVER_BOARDS
-        }
+        futures = {ex.submit(scrape_lever_board, s, c, scorer): c for s, c in LEVER_BOARDS}
         for f in concurrent.futures.as_completed(futures):
             try:
                 all_jobs.extend(f.result())
@@ -870,7 +900,7 @@ def scrape_all_lever(scorer: JobScorer) -> List[dict]:
 
 ICIMS_CLIENTS = [
     ("blakes",       "Blake Cassels & Graydon"),
-    ("mccarthy",     "McCarthy Tétrault"),
+    ("mccarthy",     "McCarthy Tetrault"),
     ("nortonrose",   "Norton Rose Fulbright"),
     ("torys",        "Torys LLP"),
     ("stikeman",     "Stikeman Elliott"),
@@ -917,10 +947,7 @@ def scrape_all_icims(scorer: JobScorer) -> List[dict]:
     log.info(f"  [iCIMS] Scanning {len(ICIMS_CLIENTS)} clients...")
     all_jobs: List[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {
-            ex.submit(scrape_icims_client, s, c, scorer): c
-            for s, c in ICIMS_CLIENTS
-        }
+        futures = {ex.submit(scrape_icims_client, s, c, scorer): c for s, c in ICIMS_CLIENTS}
         for f in concurrent.futures.as_completed(futures):
             try:
                 all_jobs.extend(f.result())
@@ -992,19 +1019,12 @@ def scrape_ontario_public_service(scorer: JobScorer) -> List[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. TARGET URLS — DIRECT HTML SCRAPERS
-#    v6 BUG FIX: removed domains confirmed dead in 2026-03-11 live logs:
-#    www.davies.ca (SSL mismatch) → davies.ca (bare domain)
-#    www.gutierrezlaw.ca (DNS dead) → REMOVED
-#    sookermacleod.com (DNS dead) → REMOVED
-#    www.mustardlaw.ca (DNS dead) → REMOVED
-#    www.burntsand.com (ConnectTimeout) → REMOVED
-#    careers.oba.org (ReadTimeout) → www.oba.org/Careers
+# 8. TARGET URLS — DIRECT HTML
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_target_urls() -> List[str]:
     return [
-        # ── Bay Street / National Firms ───────────────────────────────────────
+        # Bay Street / National Firms
         "https://www.joinblakes.com/careers/associates/",
         "https://www.bennettjones.com/en/Careers/Legal-Professionals",
         "https://www.fasken.com/en/careers/lawyers",
@@ -1019,11 +1039,8 @@ def get_target_urls() -> List[str]:
         "https://cassels.com/join-us/career-opportunities-lawyers/",
         "https://www.airdberlis.com/join-us/current-opportunities",
         "https://www.osler.com/en/careers/opportunities",
-        # BUG FIX: www.davies.ca → SSL cert is NOT valid for www subdomain.
-        # Using bare domain davies.ca (added to SSL_SOFT_DOMAINS)
         "https://davies.ca/careers/",
-
-        # ── Ontario Regional Firms ────────────────────────────────────────────
+        # Ontario Regional Firms
         "https://www.litigate.com/careers/lawyers",
         "https://www.wildlaw.ca/careers/lawyers/",
         "https://www.weirfoulds.com/careers/lawyers-and-law-students/",
@@ -1048,10 +1065,7 @@ def get_target_urls() -> List[str]:
         "https://www.chaitons.com/careers/",
         "https://www.lerners.ca/careers/",
         "https://hicksadams.com/careers/",
-        # Removed: www.gutierrezlaw.ca (DNS dead confirmed 2026-03-11)
-        # Removed: sookermacleod.com (DNS dead confirmed 2026-03-11)
-
-        # ── Alberta Regional Firms ────────────────────────────────────────────
+        # Alberta Regional Firms
         "https://www.fieldlaw.com/careers/associate-opportunities/",
         "https://www.bdplaw.com/careers/",
         "https://www.parlee.com/careers/",
@@ -1059,10 +1073,7 @@ def get_target_urls() -> List[str]:
         "https://www.brownleelaw.com/careers/",
         "https://www.emeryjamieson.com/careers/",
         "https://www.jmccormick.ca/careers/",
-        # Removed: www.mustardlaw.ca (DNS dead confirmed 2026-03-11)
-        # Removed: www.burntsand.com (ConnectTimeout confirmed 2026-03-11)
-
-        # ── International Firms (Canadian offices only) ───────────────────────
+        # International Firms (Canadian offices)
         "https://www.dentons.com/en/careers/find-a-job",
         "https://www.nortonrosefulbright.com/en-ca/careers/job-listings",
         "https://www.dlapiper.com/en/canada/careers/",
@@ -1070,20 +1081,16 @@ def get_target_urls() -> List[str]:
         "https://careers.herbertsmithfreehills.com/go/Canada/",
         "https://careers.cliffordchance.com/content/careers/en/office/toronto.html",
         "https://www.linklaters.com/en/careers/offices/toronto",
-
-        # ── Legal Recruitment / Job Boards ────────────────────────────────────
+        # Legal Recruitment
         "https://www.zsa.ca/job-board/",
         "https://thecounselnetwork.com/job-search/",
         "https://legaljobs.ca/jobs/",
-
-        # ── Bar / Law Society Boards ──────────────────────────────────────────
-        # BUG FIX: careers.oba.org → ReadTimeout. Fixed → www.oba.org/Careers
+        # Bar / Law Society Boards
         "https://www.oba.org/Careers",
         "https://lawsociety.ab.ca/about/programs-and-initiatives/careers/",
         "https://www.lso.ca/careers",
         "https://www.cba.org/For-Lawyers/Employment",
-
-        # ── In-House / Corporate Legal ────────────────────────────────────────
+        # In-House / Corporate
         "https://jobs.rbc.com/ca/en/search-results?keywords=legal+counsel",
         "https://jobs.td.com/en-CA/jobs/?keyword=legal+counsel",
         "https://www.sunlife.com/en/careers/job-search/?keyword=legal+counsel",
@@ -1094,12 +1101,10 @@ def get_target_urls() -> List[str]:
         "https://jobs.bmo.com/ca/en/search-results?keywords=legal+counsel",
         "https://jobs.scotiabank.com/search/?q=legal+counsel&l=Ontario",
         "https://www.cibc.com/en/about-cibc/careers/search-jobs.html#q=legal&l=Ontario",
-
-        # ── Law School Career Boards ──────────────────────────────────────────
+        # Law School Career Boards
         "https://ultravires.ca/jobs/",
         "https://www.osgoode.yorku.ca/careers/",
-
-        # ── Canadian Job Aggregators (location-pinned) ────────────────────────
+        # Canadian Job Aggregators
         "https://ca.indeed.com/jobs?q=associate+lawyer&l=Ontario&fromage=7",
         "https://ca.indeed.com/jobs?q=associate+lawyer&l=Alberta&fromage=7",
         "https://ca.indeed.com/jobs?q=articling+student&l=Ontario&fromage=14",
@@ -1110,7 +1115,135 @@ def get_target_urls() -> List[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 9. AGGREGATOR SCRAPER (JobSpy)
+# 9. RSS FEED SCRAPERS  (v8 — new sources, no auth required)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RSS_FEEDS = [
+    # Google News — law jobs in Ontario / Alberta
+    (
+        "https://news.google.com/rss/search?"
+        "q=associate+lawyer+hiring+Ontario+Canada&hl=en-CA&gl=CA&ceid=CA:en",
+        "google-news"
+    ),
+    (
+        "https://news.google.com/rss/search?"
+        "q=articling+student+position+Ontario&hl=en-CA&gl=CA&ceid=CA:en",
+        "google-news"
+    ),
+    (
+        "https://news.google.com/rss/search?"
+        "q=legal+counsel+job+opening+Toronto&hl=en-CA&gl=CA&ceid=CA:en",
+        "google-news"
+    ),
+    (
+        "https://news.google.com/rss/search?"
+        "q=%22associate+lawyer%22+OR+%22articling+student%22+Calgary+Edmonton&hl=en-CA&gl=CA&ceid=CA:en",
+        "google-news"
+    ),
+    # Indeed RSS feeds — reliable, structured, no auth
+    (
+        "https://ca.indeed.com/rss?q=associate+lawyer&l=Toronto%2C+Ontario&fromage=7&sort=date",
+        "indeed-rss"
+    ),
+    (
+        "https://ca.indeed.com/rss?q=associate+lawyer&l=Ontario&fromage=7&sort=date",
+        "indeed-rss"
+    ),
+    (
+        "https://ca.indeed.com/rss?q=articling+student&l=Ontario&fromage=14&sort=date",
+        "indeed-rss"
+    ),
+    (
+        "https://ca.indeed.com/rss?q=associate+lawyer&l=Alberta&fromage=7&sort=date",
+        "indeed-rss"
+    ),
+    (
+        "https://ca.indeed.com/rss?q=legal+counsel&l=Toronto%2C+Ontario&fromage=7&sort=date",
+        "indeed-rss"
+    ),
+    # ZSA Legal Recruitment RSS (top Canadian legal recruiter)
+    (
+        "https://www.zsa.ca/feed/",
+        "zsa-rss"
+    ),
+    # Ultra Vires (Osgoode / U of T law student paper — posts real openings)
+    (
+        "https://ultravires.ca/feed/",
+        "ultravires-rss"
+    ),
+]
+
+_RE_RSS_ITEM = re.compile(
+    r"<item>(.*?)</item>",
+    re.DOTALL | re.IGNORECASE,
+)
+_RE_RSS_TITLE = re.compile(r"<title[^>]*><!\[CDATA\[(.*?)\]\]></title>|<title[^>]*>(.*?)</title>", re.DOTALL | re.IGNORECASE)
+_RE_RSS_LINK  = re.compile(r"<link[^>]*>(.*?)</link>|<guid[^>]*>(.*?)</guid>",                     re.DOTALL | re.IGNORECASE)
+_RE_RSS_DATE  = re.compile(r"<pubDate[^>]*>(.*?)</pubDate>",                                        re.DOTALL | re.IGNORECASE)
+_RE_RSS_DESC  = re.compile(r"<description[^>]*><!\[CDATA\[(.*?)\]\]></description>|<description[^>]*>(.*?)</description>", re.DOTALL | re.IGNORECASE)
+
+
+def _parse_rss_items(xml: str) -> List[Dict[str, str]]:
+    items = []
+    for m in _RE_RSS_ITEM.finditer(xml):
+        block = m.group(1)
+        tm = _RE_RSS_TITLE.search(block)
+        lm = _RE_RSS_LINK.search(block)
+        dm = _RE_RSS_DATE.search(block)
+        de = _RE_RSS_DESC.search(block)
+        title = (tm.group(1) or tm.group(2) or "").strip() if tm else ""
+        link  = (lm.group(1) or lm.group(2) or "").strip() if lm else ""
+        date  = (dm.group(1) or "").strip()[:10]            if dm else ""
+        desc  = (de.group(1) or de.group(2) or "").strip()  if de else ""
+        # strip HTML from desc
+        desc  = BeautifulSoup(desc, "html.parser").get_text(" ")
+        if title and link:
+            items.append({"title": title, "link": link, "date": date, "desc": desc})
+    return items
+
+
+def scrape_rss_feeds(scorer: JobScorer) -> List[dict]:
+    session = get_session()
+    results: List[dict] = []
+
+    for feed_url, source_name in _RSS_FEEDS:
+        try:
+            resp = safe_get(session, feed_url, timeout=15)
+            if not resp:
+                continue
+            items = _parse_rss_items(resp.text)
+            for item in items:
+                title = item["title"]
+                link  = item["link"]
+                desc  = item["desc"]
+                date  = item["date"]
+
+                if not (RE_ASSOCIATE.search(title) or RE_STUDENT.search(title)):
+                    if not (RE_ASSOCIATE.search(desc[:300]) or RE_STUDENT.search(desc[:300])):
+                        continue
+
+                company = _domain_key(link).title() if link else source_name
+                is_fit, cat, score = scorer.score_job(title, desc, link, company)
+                if is_fit:
+                    results.append({
+                        "TITLE":    title,
+                        "COMPANY":  company,
+                        "URL":      link,
+                        "CATEGORY": cat,
+                        "SCORE":    score,
+                        "SOURCE":   source_name,
+                        "DATE":     date,
+                    })
+        except Exception as e:
+            log.debug(f"[RSS] {source_name} ({feed_url[:60]}): {e}")
+
+    if results:
+        log.info(f"  → {len(results)} hits from RSS feeds")
+    return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. JOBSPY AGGREGATOR
 # ─────────────────────────────────────────────────────────────────────────────
 
 def scrape_jobspy_wrapper(scorer: JobScorer) -> pd.DataFrame:
@@ -1173,7 +1306,157 @@ def scrape_jobspy_wrapper(scorer: JobScorer) -> pd.DataFrame:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 10. ORCHESTRATE ALL SCRAPERS
+# 11. GMAIL JOB ALERT SCANNER
+# ─────────────────────────────────────────────────────────────────────────────
+
+_GMAIL_SEARCH_QUERIES = [
+    "subject:(job alert OR new jobs) (associate lawyer OR articling student OR legal counsel) newer_than:7d",
+    "subject:(opportunity OR position OR role OR opening) (associate OR counsel OR lawyer OR articling) newer_than:7d",
+    "from:jobalerts-noreply@linkedin.com newer_than:7d",
+    "from:jobalerts@indeed.com newer_than:7d",
+    "from:googlealerts-noreply@google.com (associate lawyer OR articling student OR legal counsel) newer_than:7d",
+    "from:(zsa.ca OR thecounselnetwork.com OR legaljobs.ca) newer_than:7d",
+]
+
+_RE_EMAIL_JOB_LINK = re.compile(
+    r"((?:associate|counsel|lawyer|articling|solicitor|juriste)[^\n<]{0,80}?)\s*"
+    r"<?(https?://[^\s>\"]{20,300})>?",
+    re.IGNORECASE,
+)
+_RE_EMAIL_SUBJECT_JOB = re.compile(
+    r"\b(associate|lawyer|counsel|articling|solicitor|legal\s+counsel|corporate\s+counsel)\b",
+    re.IGNORECASE,
+)
+
+
+def _get_gmail_service():
+    if not _GMAIL_AVAILABLE:
+        return None
+    token_json = os.environ.get("GMAIL_TOKEN_JSON")
+    if not token_json:
+        log.info("[Gmail] GMAIL_TOKEN_JSON not set — skipping Gmail scan.")
+        return None
+    try:
+        creds = Credentials.from_authorized_user_info(
+            json.loads(token_json),
+            scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+        )
+        if creds.expired and creds.refresh_token:
+            creds.refresh(GRequest())
+        return gbuild("gmail", "v1", credentials=creds, cache_discovery=False)
+    except Exception as e:
+        log.warning(f"[Gmail] Could not build service: {e}")
+        return None
+
+
+def _extract_email_body(msg_data: dict) -> str:
+    try:
+        payload = msg_data.get("payload", {})
+
+        def _decode(part):
+            data = part.get("body", {}).get("data", "")
+            return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace") if data else ""
+
+        mt = payload.get("mimeType", "")
+        if mt == "text/plain":
+            return _decode(payload)
+        if mt == "text/html":
+            return BeautifulSoup(_decode(payload), "html.parser").get_text(" ")
+
+        text_parts = []
+        for part in payload.get("parts", []):
+            smt = part.get("mimeType", "")
+            if smt == "text/plain":
+                text_parts.append(_decode(part))
+            elif smt == "text/html":
+                text_parts.append(BeautifulSoup(_decode(part), "html.parser").get_text(" "))
+            elif smt.startswith("multipart/"):
+                for sub in part.get("parts", []):
+                    ssmt = sub.get("mimeType", "")
+                    raw = _decode(sub)
+                    text_parts.append(
+                        BeautifulSoup(raw, "html.parser").get_text(" ") if ssmt == "text/html" else raw
+                    )
+        return " ".join(text_parts)
+    except Exception:
+        return ""
+
+
+def scrape_gmail(scorer: JobScorer) -> List[dict]:
+    service = _get_gmail_service()
+    if not service:
+        return []
+
+    results:   List[dict] = []
+    seen_urls: Set[str]   = set()
+
+    # Run all queries concurrently
+    def _query(query: str) -> List[dict]:
+        found = []
+        try:
+            resp     = service.users().messages().list(userId="me", q=query, maxResults=50).execute()
+            messages = resp.get("messages", [])
+            for stub in messages:
+                try:
+                    msg     = service.users().messages().get(userId="me", id=stub["id"], format="full").execute()
+                    headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
+                    subject = headers.get("subject", "")
+                    sender  = headers.get("from", "")
+                    body    = _extract_email_body(msg)
+                    combined = f"{subject} {body}"
+
+                    for m in _RE_EMAIL_JOB_LINK.finditer(combined):
+                        title = m.group(1).strip().rstrip("--").strip()
+                        url   = _strip_tracking(m.group(2).strip())
+                        if url in seen_urls or len(title) < MIN_TITLE_LENGTH:
+                            continue
+                        is_fit, cat, score = scorer.score_job(title, body, url, sender)
+                        if is_fit:
+                            seen_urls.add(url)
+                            found.append({
+                                "TITLE":    title,
+                                "COMPANY":  sender.split("<")[0].strip() or "Email Alert",
+                                "URL":      url,
+                                "CATEGORY": cat,
+                                "SCORE":    score,
+                                "SOURCE":   "gmail",
+                                "DATE":     headers.get("date", "")[:10],
+                            })
+
+                    if _RE_EMAIL_SUBJECT_JOB.search(subject) and len(subject) >= MIN_TITLE_LENGTH:
+                        is_fit, cat, score = scorer.score_job(subject, body, "", sender)
+                        if is_fit:
+                            found.append({
+                                "TITLE":    subject[:120],
+                                "COMPANY":  sender.split("<")[0].strip() or "Email Alert",
+                                "URL":      f"gmail://message/{stub['id']}",
+                                "CATEGORY": cat,
+                                "SCORE":    score,
+                                "SOURCE":   "gmail",
+                                "DATE":     headers.get("date", "")[:10],
+                            })
+                except Exception as e:
+                    log.debug(f"[Gmail] Message parse error: {e}")
+        except Exception as e:
+            log.debug(f"[Gmail] Query failed: {e}")
+        return found
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        for batch in concurrent.futures.as_completed(
+            {ex.submit(_query, q): q for q in _GMAIL_SEARCH_QUERIES}
+        ):
+            try:
+                results.extend(batch.result())
+            except Exception:
+                pass
+
+    if results:
+        log.info(f"  → {len(results)} hits from Gmail")
+    return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. ORCHESTRATE ALL SCRAPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_direct_scrape(urls: List[str], scorer: JobScorer) -> pd.DataFrame:
@@ -1194,41 +1477,52 @@ def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
     frames = []
 
     target_urls = get_target_urls()
-    log.info(f"\n── Direct HTML scrape ({len(target_urls)} sites) ─────────────")
+    log.info(f"\n-- Direct HTML scrape ({len(target_urls)} sites) ----------")
     frames.append(run_direct_scrape(target_urls, scorer))
 
-    log.info("\n── Workday ATS ──────────────────────────────────────────")
+    log.info("\n-- RSS Feeds -------------------------------------------")
+    rss_jobs = scrape_rss_feeds(scorer)
+    if rss_jobs:
+        frames.append(pd.DataFrame(rss_jobs))
+
+    log.info("\n-- Workday ATS -----------------------------------------")
     wd_jobs = scrape_all_workday(scorer)
     if wd_jobs:
         frames.append(pd.DataFrame(wd_jobs))
-    log.info(f"  → {len(wd_jobs)} raw hits from Workday")
+    log.info(f"  -> {len(wd_jobs)} raw hits from Workday")
 
-    log.info("\n── Greenhouse ATS ───────────────────────────────────────")
+    log.info("\n-- Greenhouse ATS --------------------------------------")
     gh_jobs = scrape_all_greenhouse(scorer)
     if gh_jobs:
         frames.append(pd.DataFrame(gh_jobs))
-    log.info(f"  → {len(gh_jobs)} raw hits from Greenhouse")
+    log.info(f"  -> {len(gh_jobs)} raw hits from Greenhouse")
 
-    log.info("\n── Lever ATS ────────────────────────────────────────────")
+    log.info("\n-- Lever ATS -------------------------------------------")
     lv_jobs = scrape_all_lever(scorer)
     if lv_jobs:
         frames.append(pd.DataFrame(lv_jobs))
-    log.info(f"  → {len(lv_jobs)} raw hits from Lever")
+    log.info(f"  -> {len(lv_jobs)} raw hits from Lever")
 
-    log.info("\n── iCIMS ATS ────────────────────────────────────────────")
+    log.info("\n-- iCIMS ATS -------------------------------------------")
     ic_jobs = scrape_all_icims(scorer)
     if ic_jobs:
         frames.append(pd.DataFrame(ic_jobs))
-    log.info(f"  → {len(ic_jobs)} raw hits from iCIMS")
+    log.info(f"  -> {len(ic_jobs)} raw hits from iCIMS")
 
-    log.info("\n── Government portals ───────────────────────────────────")
+    log.info("\n-- Government portals ----------------------------------")
     gov_jobs = scrape_gc_jobs(scorer) + scrape_ontario_public_service(scorer)
     if gov_jobs:
         frames.append(pd.DataFrame(gov_jobs))
-    log.info(f"  → {len(gov_jobs)} raw hits from Government")
+    log.info(f"  -> {len(gov_jobs)} raw hits from Government")
 
-    log.info("\n── JobSpy aggregators ───────────────────────────────────")
+    log.info("\n-- JobSpy aggregators ----------------------------------")
     frames.append(scrape_jobspy_wrapper(scorer))
+
+    log.info("\n-- Gmail job alerts ------------------------------------")
+    gmail_jobs = scrape_gmail(scorer)
+    if gmail_jobs:
+        frames.append(pd.DataFrame(gmail_jobs))
+    log.info(f"  -> {len(gmail_jobs)} hits from Gmail")
 
     non_empty = [f for f in frames if f is not None and not f.empty]
     if not non_empty:
@@ -1237,11 +1531,11 @@ def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 11. DEDUPLICATION (fuzzy matching, strips stopwords)
+# 13. DEDUPLICATION
 # ─────────────────────────────────────────────────────────────────────────────
 
 _STOPWORDS = re.compile(
-    r"\b(the|a|an|at|in|for|of|and|or|–|-|&|llp|lp|inc|ltd|corp|"
+    r"\b(the|a|an|at|in|for|of|and|or|-|&|llp|lp|inc|ltd|corp|"
     r"toronto|ontario|calgary|alberta|canada|remote|hybrid|office)\b",
     re.IGNORECASE,
 )
@@ -1252,24 +1546,61 @@ def _make_sig(row: pd.Series) -> str:
     c = re.sub(r"\W+", " ", str(row.get("COMPANY", "")).lower())
     t = _STOPWORDS.sub("", t).strip()
     c = _STOPWORDS.sub("", c).strip()
-    t = re.sub(r"\s+", "_", t)
-    c = re.sub(r"\s+", "_", c)
-    return f"{t}__{c}"
+    return f"{re.sub(chr(32)+'+','_',t)}__{re.sub(chr(32)+'+','_',c)}"
 
 
 def deduplicate_jobs(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     df = df.copy()
+    # 1. Fuzzy title+company dedup
     df["SIG"]       = df.apply(_make_sig, axis=1)
     df              = df.drop_duplicates(subset=["SIG"])
-    df["CLEAN_URL"] = df["URL"].apply(lambda x: str(x).split("?")[0])
+    # 2. Exact URL dedup (strip tracking params)
+    df["CLEAN_URL"] = df["URL"].apply(lambda x: _strip_tracking(str(x)).split("?")[0])
     df              = df.drop_duplicates(subset=["CLEAN_URL"])
     return df.drop(columns=["SIG", "CLEAN_URL"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 12. RESULTS JSON
+# 14. HISTORY MANAGEMENT  (v8: with TTL expiry)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_history() -> Dict[str, str]:
+    """Return {clean_url: date_seen_iso} dict."""
+    if not os.path.exists(HISTORY_FILE):
+        return {}
+    try:
+        with open(HISTORY_FILE) as f:
+            raw = json.load(f)
+        # Legacy format was a plain list of URLs
+        if isinstance(raw, list):
+            return {url: "2000-01-01" for url in raw}
+        return raw
+    except Exception:
+        return {}
+
+
+def save_history(history: Dict[str, str]) -> None:
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(history, f)
+    except Exception as e:
+        log.warning(f"Could not save history: {e}")
+
+
+def prune_history(history: Dict[str, str], ttl_days: int) -> Dict[str, str]:
+    """Remove entries older than ttl_days so jobs can resurface after TTL."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).strftime("%Y-%m-%d")
+    pruned = {url: seen for url, seen in history.items() if seen >= cutoff}
+    removed = len(history) - len(pruned)
+    if removed:
+        log.info(f"[History] Pruned {removed} expired entries (TTL={ttl_days}d)")
+    return pruned
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 15. RESULTS JSON
 # ─────────────────────────────────────────────────────────────────────────────
 
 def append_results(jobs: List[dict], run_ts: str, weights: Dict[str, Any]) -> None:
@@ -1308,31 +1639,35 @@ def append_results(jobs: List[dict], run_ts: str, weights: Dict[str, Any]) -> No
     try:
         with open(RESULTS_FILE, "w") as f:
             json.dump(data, f, indent=2, default=str)
-        log.info(f"✓ Results saved to {RESULTS_FILE}")
+        log.info(f"Results saved to {RESULTS_FILE}")
     except Exception as e:
         log.warning(f"Could not save results: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 13. TELEGRAM ALERT  (v6: single consolidated message, correct dashboard URL)
+# 16. TELEGRAM ALERT  (v8: sorted by score, star rating, new-firm badge)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
-    """
-    BUG FIX (v6): Build the complete message first, then send it in ONE
-    Telegram API call. If the message exceeds 4 096 chars (Telegram's limit),
-    trim the job list from the bottom and append a "… and N more" footer.
-    This guarantees a single consolidated alert — not a flood of chunks.
+def _stars(score: int) -> str:
+    """Convert numeric score to 1-5 star emoji rating."""
+    if score >= 18:  return "★★★★★"
+    if score >= 14:  return "★★★★☆"
+    if score >= 10:  return "★★★☆☆"
+    if score >= 7:   return "★★☆☆☆"
+    return "★☆☆☆☆"
 
-    Also fixes the dashboard URL: always uses DASHBOARD_URL env var which
-    defaults to https://law-associate-job-alerts.vercel.app/
-    """
+
+def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id   = os.environ.get("TELEGRAM_CHAT_ID")
 
     if not (bot_token and chat_id):
         print("\n[!] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing. No alert sent.", flush=True)
         return
+
+    # Sort by score descending
+    if not df.empty and "SCORE" in df.columns:
+        df = df.sort_values("SCORE", ascending=False)
 
     associates = df[df["CATEGORY"] == "Associate"] if not df.empty else pd.DataFrame()
     students   = df[df["CATEGORY"] == "Student"]   if not df.empty else pd.DataFrame()
@@ -1342,62 +1677,58 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
     if not df.empty and "SOURCE" in df.columns:
         for src, grp in df.groupby("SOURCE"):
             source_counts[str(src)] = len(grp)
-    src_str = " · ".join(f"{s}:{n}" for s, n in sorted(source_counts.items())) or "none"
+    src_str = " | ".join(f"{s}:{n}" for s, n in sorted(source_counts.items())) or "none"
 
-    # ── Build job lines ────────────────────────────────────────────────────
+    first_seen = set(weights.get("first_seen_domains", []))
+
+    def _fmt_job(row: pd.Series, show_score: bool = True) -> str:
+        domain    = _domain_key(str(row.get("URL", "")))
+        new_badge = " [NEW FIRM]" if domain in first_seen and domain in TRUSTED_CA_DOMAINS else ""
+        stars     = f" {_stars(int(row.get('SCORE', 0)))}" if show_score else ""
+        src_badge = f" ({row['SOURCE']})" if row.get("SOURCE") else ""
+        return (
+            f"*  <a href=\"{row['URL']}\">{row['TITLE']}</a>"
+            f"{new_badge}{stars}\n"
+            f"   {row['COMPANY']}{src_badge}"
+        )
+
     assoc_lines: List[str] = []
     if not associates.empty:
-        assoc_lines.append("\n<b>🏛 ASSOCIATES / LAWYERS</b>")
-        for _, row in associates.iterrows():
-            score_str = f" [{row['SCORE']}]" if row.get("SCORE") else ""
-            src_badge = f" <i>({row['SOURCE']})</i>" if row.get("SOURCE") else ""
-            assoc_lines.append(
-                f"• <a href=\"{row['URL']}\">{row['TITLE']}</a> "
-                f"— {row['COMPANY']}{score_str}{src_badge}"
-            )
+        assoc_lines.append("\n<b>ASSOCIATES / LAWYERS</b>")
+        assoc_lines.extend(_fmt_job(r) for _, r in associates.iterrows())
 
     stud_lines: List[str] = []
     if not students.empty:
-        stud_lines.append("\n<b>🎓 ARTICLING / STUDENTS</b>")
-        for _, row in students.iterrows():
-            src_badge = f" <i>({row['SOURCE']})</i>" if row.get("SOURCE") else ""
-            stud_lines.append(
-                f"• <a href=\"{row['URL']}\">{row['TITLE']}</a> "
-                f"— {row['COMPANY']}{src_badge}"
-            )
+        stud_lines.append("\n<b>ARTICLING / STUDENTS</b>")
+        stud_lines.extend(_fmt_job(r, show_score=False) for _, r in students.iterrows())
 
-    # ── Header and footer ─────────────────────────────────────────────────
     header = "\n".join([
-        f"<b>⚖️ Law Jobs — ON/AB | {now_str}</b>",
-        f"<b>{len(df)} new listing(s) found</b>",
-        (f"<i>Model run #{weights.get('training_runs','?')} · "
-         f"Threshold: {weights.get('score_threshold',5)} · "
-         f"All-time: {weights.get('total_jobs_found',0)} jobs</i>"),
-        f"<i>Sources: {src_str}</i>",
+        f"<b>Law Jobs -- ON/AB | {now_str}</b>",
+        f"<b>{len(df)} new listing(s)</b>",
+        (f"<i>Run #{weights.get('training_runs','?')} | "
+         f"Threshold {weights.get('score_threshold',5)} | "
+         f"All-time {weights.get('total_jobs_found',0)}</i>"),
+        f"<i>{src_str}</i>",
     ])
-    footer = f"\n\n📊 <a href=\"{DASHBOARD_URL}\">Open Dashboard</a>"
+    footer = f"\n\n<a href=\"{DASHBOARD_URL}\">Open Dashboard</a>"
 
     if df.empty:
-        header += "\n\n<i>No new positions this run. Model will lower threshold next cycle.</i>"
+        header += "\n\n<i>No new positions this run.</i>"
 
-    # ── Fit everything into ≤ 4096 chars (single Telegram message) ────────
-    LIMIT = 4090  # leave a small margin
-
+    LIMIT         = 4090
     all_job_lines = assoc_lines + stud_lines
     full_msg      = header + "\n".join(all_job_lines) + footer
 
     if len(full_msg) > LIMIT:
-        # Trim from the tail until it fits
         trimmed: List[str] = []
         dropped = 0
         for line in all_job_lines:
-            candidate = header + "\n".join(trimmed + [line]) + footer
-            if len(candidate) <= LIMIT:
+            if len(header + "\n".join(trimmed + [line]) + footer) <= LIMIT:
                 trimmed.append(line)
             else:
                 dropped += 1
         if dropped:
-            trimmed.append(f"\n<i>… and {dropped} more — see dashboard</i>")
+            trimmed.append(f"\n<i>... and {dropped} more -- see dashboard</i>")
         full_msg = header + "\n".join(trimmed) + footer
 
     api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -1410,34 +1741,254 @@ def send_telegram(df: pd.DataFrame, weights: Dict[str, Any]) -> None:
     try:
         resp = requests.post(api_url, json=payload, timeout=15)
         if resp.ok:
-            print("✓ Telegram alert sent (single message).", flush=True)
+            print("Telegram alert sent.", flush=True)
         else:
-            print(f"✗ Telegram error: {resp.status_code} — {resp.text}", flush=True)
+            print(f"Telegram error: {resp.status_code} -- {resp.text}", flush=True)
     except Exception as e:
-        print(f"✗ Telegram request failed: {e}", flush=True)
+        print(f"Telegram request failed: {e}", flush=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 14. MAIN
+# 17. LLM EXPERIENCE LEVEL FILTER  — powered by Gemini 1.5 Flash (FREE tier)
+# ─────────────────────────────────────────────────────────────────────────────
+# Uses Google Gemini 1.5 Flash via plain REST (no SDK, no new packages).
+# Free tier: 15 requests/min, 1 million tokens/day — more than enough.
+# No credit card required.
+#
+# Setup (one time):
+#   1. Go to https://aistudio.google.com/apikey
+#   2. Click "Create API Key" — sign in with any Google account
+#   3. Copy the key (starts with AIza...)
+#   4. Add GitHub secret: GEMINI_API_KEY = <your key>
+#
+# The classifier fetches each job's full description page, sends it to Gemini,
+# and gets back a structured JSON verdict. Results are cached by URL hash in
+# llm_cache.json so each URL is only classified once across all future runs.
+#
+# Fail-open: if GEMINI_API_KEY is absent or the API fails, all jobs pass
+# through — no outage risk.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_GEMINI_API_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/"
+    "models/gemini-1.5-flash:generateContent"
+)
+_LLM_TIMEOUT = 20
+_LLM_WORKERS = 5   # concurrent Gemini calls (well within 15 rpm free limit)
+
+_LLM_SYSTEM = (
+    "You are a legal recruitment classifier. Determine whether a Canadian law "
+    "job posting is suitable for a NEWLY CALLED or JUNIOR lawyer "
+    "(0-2 years post-call / 0-2 PQE). "
+    "Respond ONLY with valid JSON matching this schema exactly — no markdown, "
+    "no extra text: "
+    '{"eligible": true|false, "min_years": integer|null, "max_years": integer|null, '
+    '"reason": "one concise sentence", "is_real_job": true|false}. '
+    "Rules: "
+    "eligible=true ONLY if posting targets 0-2 yrs OR is silent on experience AND title is not senior. "
+    "eligible=false if 3+ years required (even preferred), mid-level, senior, supervise a team, "
+    "general counsel, VP, director, or any clear seniority signal. "
+    "eligible=false if text is NOT a job posting (past legal matter descriptions like "
+    "'Counsel to X during CCAA', talent pool forms, generic careers pages). "
+    "is_real_job=false for talent pools, interest forms, past matters. "
+    "min_years/max_years: extract stated range; null if not mentioned."
+)
+
+_LLM_USER_TMPL = (
+    "Job title: {title}\n"
+    "Company: {company}\n"
+    "URL: {url}\n\n"
+    "--- Description (up to 3000 chars) ---\n"
+    "{desc}\n"
+    "---\n\n"
+    "Classify. eligible=true ONLY for 0-2 years post-call."
+)
+
+
+def _url_hash(url: str) -> str:
+    return hashlib.sha256(url.encode()).hexdigest()[:16]
+
+
+def _load_llm_cache() -> Dict[str, dict]:
+    if os.path.exists(LLM_CACHE_FILE):
+        try:
+            with open(LLM_CACHE_FILE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _save_llm_cache(cache: Dict[str, dict]) -> None:
+    try:
+        with open(LLM_CACHE_FILE, "w") as f:
+            json.dump(cache, f, indent=2)
+    except Exception as e:
+        log.warning(f"[LLM] Could not save cache: {e}")
+
+
+def _fetch_description(url: str) -> str:
+    """Fetch and clean a job posting page. Returns '' on failure."""
+    if not url or url.startswith("gmail://"):
+        return ""
+    try:
+        session = get_session()
+        resp    = safe_get(session, url, timeout=15)
+        if not resp:
+            return ""
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header", "noscript", "aside"]):
+            tag.extract()
+        return " ".join(soup.get_text(separator=" ").split())[:4000]
+    except Exception:
+        return ""
+
+
+def _call_gemini(prompt: str, api_key: str) -> dict:
+    """
+    Call Gemini 1.5 Flash and return a parsed verdict dict.
+    Uses responseMimeType=application/json so the model is forced to emit
+    valid JSON — no markdown fences to strip.
+    Raises on hard failures; caller should catch and fail-open.
+    """
+    payload = {
+        "systemInstruction": {"parts": [{"text": _LLM_SYSTEM}]},
+        "contents":          [{"parts": [{"text": prompt}]}],
+        "generationConfig":  {
+            "responseMimeType": "application/json",
+            "maxOutputTokens":  256,
+            "temperature":      0.0,   # deterministic
+        },
+    }
+    resp = requests.post(
+        _GEMINI_API_URL,
+        params={"key": api_key},
+        json=payload,
+        timeout=_LLM_TIMEOUT,
+    )
+    resp.raise_for_status()
+    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    return json.loads(text)
+
+
+def _classify_one(job: dict, cache: Dict[str, dict], api_key: str) -> dict:
+    """
+    Classify one job. Returns job dict extended with:
+      LLM_ELIGIBLE  bool
+      LLM_REASON    str
+      LLM_CACHED    bool
+    Never raises — fails open (eligible=True) on any error.
+    """
+    url     = _strip_tracking(str(job.get("URL", ""))).split("?")[0]
+    key     = _url_hash(url)
+    title   = str(job.get("TITLE",   ""))
+    company = str(job.get("COMPANY", ""))
+
+    # Cache hit
+    if key in cache:
+        v = cache[key]
+        return {**job,
+                "LLM_ELIGIBLE": v.get("eligible", True),
+                "LLM_REASON":   v.get("reason", "cached"),
+                "LLM_CACHED":   True}
+
+    # Fetch description
+    desc = str(job.get("DESC", "")) or _fetch_description(url)
+    if not desc:
+        desc = title
+
+    prompt  = _LLM_USER_TMPL.format(
+        title=title, company=company, url=url, desc=desc[:3000]
+    )
+
+    try:
+        verdict = _call_gemini(prompt, api_key)
+    except Exception as e:
+        log.warning(f"[LLM] Gemini error for '{title[:40]}': {e}")
+        verdict = {"eligible": True, "reason": f"api-error: {e}", "is_real_job": True}
+
+    cache[key] = {
+        "eligible":    verdict.get("eligible", True),
+        "is_real_job": verdict.get("is_real_job", True),
+        "min_years":   verdict.get("min_years"),
+        "max_years":   verdict.get("max_years"),
+        "reason":      verdict.get("reason", ""),
+        "title":       title,
+        "classified":  datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    }
+    return {**job,
+            "LLM_ELIGIBLE": verdict.get("eligible", True),
+            "LLM_REASON":   verdict.get("reason", ""),
+            "LLM_CACHED":   False}
+
+
+def llm_filter_jobs(jobs: List[dict]) -> List[dict]:
+    """
+    Filter jobs to 0-2 year roles using Gemini 1.5 Flash (free tier).
+    Falls back to passing all jobs through if GEMINI_API_KEY is not set.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        log.warning("[LLM] GEMINI_API_KEY not set — skipping experience filter.")
+        return jobs
+    if not jobs:
+        return jobs
+
+    cache = _load_llm_cache()
+    log.info(f"\n-- Gemini experience filter ({len(jobs)} candidates) --------")
+
+    results: List[Optional[dict]] = [None] * len(jobs)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_LLM_WORKERS) as ex:
+        future_to_idx = {
+            ex.submit(_classify_one, job, cache, api_key): i
+            for i, job in enumerate(jobs)
+        }
+        for future in concurrent.futures.as_completed(future_to_idx):
+            i = future_to_idx[future]
+            try:
+                results[i] = future.result()
+            except Exception as e:
+                log.warning(f"[LLM] Unhandled error on job #{i}: {e}")
+                results[i] = {**jobs[i], "LLM_ELIGIBLE": True,
+                              "LLM_REASON": "exception", "LLM_CACHED": False}
+
+    _save_llm_cache(cache)
+
+    eligible   = [r for r in results if r and r.get("LLM_ELIGIBLE")]
+    ineligible = [r for r in results if r and not r.get("LLM_ELIGIBLE")]
+    cached_n   = sum(1 for r in results if r and r.get("LLM_CACHED"))
+
+    log.info(f"  [LLM] {len(eligible)} eligible / {len(ineligible)} filtered / {cached_n} from cache")
+    for r in ineligible:
+        log.info(f"  [LLM] REMOVED: '{r.get('TITLE','')[:55]}' — {r.get('LLM_REASON','')}")
+
+    return eligible
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 18. MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     print("=" * 60, flush=True)
-    print("Law Associate Job Scraper — v6 Live-Log Bug-Fix Edition", flush=True)
+    print("Law Associate Job Scraper -- v9", flush=True)
     print(f"Run: {run_ts}", flush=True)
     print("=" * 60, flush=True)
 
     weights = load_weights()
     scorer  = JobScorer(weights)
 
-    print(f"\n[Model]  Score threshold : {scorer.threshold}", flush=True)
+    print(f"\n[Model]  Score threshold  : {scorer.threshold}", flush=True)
     print(f"[Model]  Training run #   : {weights['training_runs']}", flush=True)
     print(f"[Model]  All-time jobs    : {weights.get('total_jobs_found', 0)}", flush=True)
     dead = weights.get("low_productivity_domains", [])
     if dead:
-        print(f"[Model]  Auto-pruned domains: {', '.join(dead)}", flush=True)
+        print(f"[Model]  Auto-pruned      : {', '.join(dead[:10])}{'...' if len(dead)>10 else ''}", flush=True)
+    llm_on = bool(os.environ.get("GEMINI_API_KEY"))
+    print(f"[Model]  LLM filter       : {'ON (Gemini 1.5 Flash free)' if llm_on else 'OFF (add GEMINI_API_KEY secret)'}", flush=True)
     print(flush=True)
 
     # 1. Run all scrapers
@@ -1447,47 +1998,46 @@ def main() -> None:
     unique_jobs = deduplicate_jobs(combined)
     log.info(f"After dedup: {len(unique_jobs)} unique candidates")
 
-    # 3. History filter
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE) as f:
-                history_ids: set = set(json.load(f))
-        except Exception:
-            history_ids = set()
-    else:
-        history_ids = set()
+    # 3. LLM experience filter — runs BEFORE history so we never mark a
+    #    too-senior job as "seen" and block it from being re-evaluated later.
+    llm_candidates = unique_jobs.to_dict("records") if not unique_jobs.empty else []
+    llm_passed     = llm_filter_jobs(llm_candidates)
 
+    # 4. History filter (with TTL expiry)
+    history   = load_history()
+    history   = prune_history(history, HISTORY_TTL_DAYS)
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     final_jobs: List[dict] = []
-    for _, row in unique_jobs.iterrows():
-        clean_url = str(row.get("URL", "")).split("?")[0]
-        if clean_url not in history_ids:
-            final_jobs.append(row.to_dict())
-            history_ids.add(clean_url)
+
+    for row in llm_passed:
+        clean_url = _strip_tracking(str(row.get("URL", ""))).split("?")[0]
+        if clean_url not in history:
+            # Strip internal LLM metadata before storing/alerting
+            job = {k: v for k, v in row.items()
+                   if k not in ("LLM_ELIGIBLE", "LLM_REASON", "LLM_CACHED", "DESC")}
+            final_jobs.append(job)
+            history[clean_url] = today_str
 
     final_df = pd.DataFrame(final_jobs)
 
-    # 4. Print output
+    # 5. Print output
     print(f"\n{'='*60}", flush=True)
-    print(f"✓ Final Verified New Jobs: {len(final_df)}", flush=True)
+    print(f"Final Verified New Jobs: {len(final_df)}", flush=True)
     if not final_df.empty:
         cols = [c for c in ["TITLE", "COMPANY", "CATEGORY", "SOURCE", "SCORE"] if c in final_df.columns]
         print(final_df[cols].to_string(index=False), flush=True)
 
-    # 5. Self-training
+    # 6. Self-training
     weights = train_model(weights, final_jobs, get_target_urls(), run_ts)
     save_weights(weights)
 
-    # 6. Persist results for dashboard
+    # 7. Persist results
     append_results(final_jobs, run_ts, weights)
 
-    # 7. Save history
-    try:
-        with open(HISTORY_FILE, "w") as f:
-            json.dump(list(history_ids), f)
-    except Exception as e:
-        log.warning(f"Could not save history: {e}")
+    # 8. Save history
+    save_history(history)
 
-    # 8. Telegram (single consolidated message)
+    # 9. Telegram
     send_telegram(final_df, weights)
 
 

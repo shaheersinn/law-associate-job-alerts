@@ -4,3 +4,8 @@ beautifulsoup4>=4.12
 requests>=2.31.0
 lxml>=4.9.0
 urllib3>=1.26
+# Gmail API
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-httplib2>=0.1.1
+# Note: Gemini LLM filter uses plain requests (already above) — no extra package needed
