@@ -4,6 +4,13 @@ on:
   schedule:
     - cron: '0 */2 * * *'
   workflow_dispatch:
+    inputs:
+      reset_caches:
+        description: 'Reset all caches (weights, history, LLM) — use after a fresh deploy'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
 
 permissions:
   contents: write
@@ -31,7 +38,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Only restore caches when NOT doing a manual reset run
       - name: Restore job history cache
+        if: ${{ inputs.reset_caches != 'true' }}
         uses: actions/cache/restore@v4
         with:
           path: job_history.json
@@ -39,6 +48,7 @@ jobs:
           restore-keys: job-history-${{ runner.os }}-
 
       - name: Restore model weights cache
+        if: ${{ inputs.reset_caches != 'true' }}
         uses: actions/cache/restore@v4
         with:
           path: model_weights.json
@@ -46,6 +56,7 @@ jobs:
           restore-keys: model-weights-${{ runner.os }}-
 
       - name: Restore LLM classification cache
+        if: ${{ inputs.reset_caches != 'true' }}
         uses: actions/cache/restore@v4
         with:
           path: llm_cache.json
@@ -64,6 +75,8 @@ jobs:
           DASHBOARD_URL:      https://law-associate-job-alerts.vercel.app/
           GMAIL_TOKEN_JSON:   ${{ secrets.GMAIL_TOKEN_JSON }}
           GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
+          HISTORY_TTL_DAYS:   "21"
+          MAX_JOB_AGE_DAYS:   "14"
         run: python main.py
 
       - name: Save job history cache

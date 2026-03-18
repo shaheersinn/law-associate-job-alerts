@@ -100,8 +100,8 @@ RESULTS_FILE      = os.environ.get("RESULTS_FILE",   "results.json")
 LLM_CACHE_FILE    = os.environ.get("LLM_CACHE_FILE", "llm_cache.json")
 RESULTS_WANTED    = int(os.environ.get("RESULTS_WANTED") or "30")
 DASHBOARD_URL     = os.environ.get("DASHBOARD_URL",  "https://law-associate-job-alerts.vercel.app/")
-HISTORY_TTL_DAYS  = int(os.environ.get("HISTORY_TTL_DAYS") or "60")
-MAX_JOB_AGE_DAYS  = int(os.environ.get("MAX_JOB_AGE_DAYS") or "14")  # drop jobs older than this   # re-check URLs after N days
+HISTORY_TTL_DAYS  = int(os.environ.get("HISTORY_TTL_DAYS") or "21")   # 21d so jobs re-surface in ~3 weeks
+MAX_JOB_AGE_DAYS  = int(os.environ.get("MAX_JOB_AGE_DAYS") or "14")   # drop postings older than 2 weeks
 
 MIN_TITLE_LENGTH      = 15
 DEAD_DOMAIN_THRESHOLD = 15   # v8: raised from 5 — 5 was far too aggressive
@@ -314,7 +314,7 @@ def _is_recent(date_str: str, max_age_days: int = MAX_JOB_AGE_DAYS) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 DEFAULT_WEIGHTS: Dict[str, Any] = {
-    "version":         8,
+    "version":         11,
     "training_runs":   0,
     "last_trained":    None,
     "score_threshold": 5,
@@ -341,8 +341,20 @@ def load_weights() -> Dict[str, Any]:
             for k, v in DEFAULT_WEIGHTS.items():
                 if k not in data:
                     data[k] = v
-            # v8: if site_productivity has 0-hit entries for TRUSTED domains with
-            # many runs, reset it entirely — it's poisoned from the domain-key bug.
+            # Version gate: anything below v11 is from the era of the domain-key bug.
+            # Hard-reset the pollution fields so a stale GitHub Actions cache can't
+            # re-poison a fresh deployment.
+            if int(data.get("version", 0)) < 11:
+                log.warning(
+                    f"[Weights] Cache has version {data.get('version')} < 11 — "
+                    "resetting site_productivity and low_productivity_domains."
+                )
+                data["site_productivity"]        = {}
+                data["low_productivity_domains"] = []
+                data["version"]                  = 11
+
+            # Corruption guard (belt-and-suspenders): trusted firms in the dead list
+            # means the domain-key bug poisoned this cache entry.
             sp = data.get("site_productivity", {})
             trusted_zero = sum(
                 1 for k, v in sp.items()
@@ -692,90 +704,111 @@ def _is_on_ab(location: str) -> bool:
     return True
 
 
-# ── 7a. Workday ──────────────────────────────────────────────────────────────
+# -- 7a. Workday (v11 fix: per-term search, fallback board slugs) --
+# ROOT CAUSE: old code used searchText="associate lawyer counsel articling"
+# Workday AND-matches all terms, so a posting titled "Associate Lawyer" gets
+# 0 matches because it doesn't also contain "counsel" and "articling".
+# Fix: search each term separately and deduplicate by externalPath.
 
 WORKDAY_TENANTS = [
-    ("fasken",           "Fasken_Careers",           "Fasken"),
-    ("millerthomson",    "MillerThomson",             "Miller Thomson"),
-    ("osler",            "Osler_External",            "Osler"),
-    ("mccarthy",         "McCarthyTetrault",          "McCarthy Tetrault"),
-    ("legalaidontario",  "LegalAidOntario",           "Legal Aid Ontario"),
-    ("ontario",          "OPS_External_site",         "Ontario Public Service"),
-    ("rbc",              "RBCCareers",                "RBC"),
-    ("td",               "TDBank",                   "TD Bank"),
-    ("manulife",         "MFCGJ_Careers",            "Manulife"),
-    ("intact",           "Intact",                   "Intact Insurance"),
-    ("enbridge",         "Enbridge",                 "Enbridge"),
-    ("cppib",            "CPPInvestments",            "CPP Investments"),
-    ("sunlife",          "SunLifeCareers",            "Sun Life"),
-    ("scotiabank",       "Scotiabank_Careers",        "Scotiabank"),
-    ("cibc",             "CIBC_External",             "CIBC"),
-    ("bmo",              "BMO_Careers",               "BMO"),
+    ("fasken",          "Fasken_External",           "Fasken"),
+    ("fasken",          "Fasken_Careers",            "Fasken"),
+    ("millerthomson",   "MillerThomson_External",    "Miller Thomson"),
+    ("millerthomson",   "MillerThomson",             "Miller Thomson"),
+    ("osler",           "Osler_External",            "Osler"),
+    ("osler",           "Osler",                    "Osler"),
+    ("mccarthy",        "McCarthyTetrault_External", "McCarthy Tetrault"),
+    ("mccarthy",        "McCarthyTetrault",          "McCarthy Tetrault"),
+    ("legalaidontario", "LegalAidOntario",           "Legal Aid Ontario"),
+    ("ontario",         "OPS_External_site",         "Ontario Public Service"),
+    ("rbc",             "RBCCareers",                "RBC"),
+    ("td",              "TDBank",                   "TD Bank"),
+    ("manulife",        "MFCGJ_Careers",            "Manulife"),
+    ("intact",          "Intact",                   "Intact Insurance"),
+    ("enbridge",        "Enbridge",                 "Enbridge"),
+    ("cppib",           "CPPInvestments",            "CPP Investments"),
+    ("sunlife",         "SunLifeCareers",            "Sun Life"),
+    ("scotiabank",      "Scotiabank_Careers",        "Scotiabank"),
+    ("cibc",            "CIBC_External",             "CIBC"),
+    ("bmo",             "BMO_Careers",               "BMO"),
 ]
 
-# v8: try all three Workday host variants before giving up
-_WD_HOSTS = ["wd3", "wd1", "wd5"]
+_WD_HOSTS        = ["wd3", "wd1", "wd5", "wd12"]
+_WD_SEARCH_TERMS = ["associate", "lawyer", "counsel", "articling", "legal"]
+
+
+def _workday_fetch(session, wd_host: str, tenant: str, board: str, term: str) -> list:
+    url     = f"https://{wd_host}/wday/cxs/{tenant}/{board}/jobs"
+    payload = {"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": term}
+    try:
+        resp = session.post(
+            url, json=payload, timeout=12,
+            headers={**_HEADERS, "Content-Type": "application/json"},
+        )
+        if resp.status_code == 200:
+            return resp.json().get("jobPostings", [])
+        log.debug(f"[Workday] {tenant}/{board} {wd_host}: HTTP {resp.status_code}")
+    except Exception as e:
+        log.debug(f"[Workday] {tenant}/{board} {wd_host}: {e}")
+    return []
+
 
 def scrape_workday_tenant(tenant: str, board: str, company: str, scorer: JobScorer) -> List[dict]:
-    session = get_session()
-    results = []
+    session   = get_session()
+    results   = []
+    seen_ext: set = set()
+
     for variant in _WD_HOSTS:
-        wd_host = f"{tenant}.{variant}.myworkdayjobs.com"
-        url     = f"https://{wd_host}/wday/cxs/{tenant}/{board}/jobs"
-        payload = {
-            "limit": 20, "offset": 0,
-            "searchText": "associate lawyer counsel articling",
-        }
-        try:
-            resp = session.post(
-                url, json=payload, timeout=15,
-                headers={**_HEADERS, "Content-Type": "application/json"},
-            )
-            if resp.status_code != 200:
-                continue
-            data = resp.json()
-            jobs = data.get("jobPostings", [])
-            if not jobs:
-                break  # valid response but no jobs — don't try other variants
+        wd_host      = f"{tenant}.{variant}.myworkdayjobs.com"
+        board_active = False
 
-            for job in jobs:
-                title    = job.get("title", "")
-                location = job.get("locationsText", "") or job.get("location", "")
+        for term in _WD_SEARCH_TERMS:
+            jobs = _workday_fetch(session, wd_host, tenant, board, term)
+            if jobs:
+                board_active = True
+            for job in (jobs or []):
                 ext_path = job.get("externalPath", "")
-                job_url  = f"https://{wd_host}/en-US/{board}/job/{ext_path}"
+                if not ext_path or ext_path in seen_ext:
+                    continue
+                seen_ext.add(ext_path)
+                title    = job.get("title", "")
+                location = (job.get("locationsText") or job.get("location") or "")
                 posted   = job.get("postedOn", "")
-
-                if not _is_law_job(title):
+                job_url  = f"https://{wd_host}/en-US/{board}/job/{ext_path}"
+                if not _is_law_job(title) or not _is_on_ab(location) or not _is_recent(posted):
                     continue
-                if not _is_on_ab(location):
-                    continue
-
                 is_fit, cat, score = scorer.score_job(title, location, job_url, company)
                 if is_fit:
                     results.append({
-                        "TITLE":    title,
-                        "COMPANY":  company,
-                        "URL":      job_url,
-                        "CATEGORY": cat,
-                        "SCORE":    score,
-                        "SOURCE":   "workday",
-                        "DATE":     posted,
+                        "TITLE": title, "COMPANY": company, "URL": job_url,
+                        "CATEGORY": cat, "SCORE": score, "SOURCE": "workday", "DATE": posted,
                     })
-            break
-        except Exception as e:
-            log.debug(f"Workday {tenant} ({variant}): {e}")
+
+        if board_active:
+            break   # board responded -- don't try other host variants
 
     return results
 
 
 def scrape_all_workday(scorer: JobScorer) -> List[dict]:
-    log.info(f"  [Workday] Scanning {len(WORKDAY_TENANTS)} tenants...")
+    seen_pairs: set = set()
+    tasks = []
+    for t, b, c in WORKDAY_TENANTS:
+        if (t, b) not in seen_pairs:
+            seen_pairs.add((t, b))
+            tasks.append((t, b, c))
+
+    log.info(f"  [Workday] Scanning {len(tasks)} tenant/board pairs (5 terms each)...")
     all_jobs: List[dict] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
-        futures = {ex.submit(scrape_workday_tenant, t, b, c, scorer): c for t, b, c in WORKDAY_TENANTS}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(scrape_workday_tenant, t, b, c, scorer): (t, b) for t, b, c in tasks}
         for f in concurrent.futures.as_completed(futures):
             try:
-                all_jobs.extend(f.result())
+                r = f.result()
+                if r:
+                    tb = futures[f]
+                    log.info(f"  [Workday] {tb[0]}/{tb[1]} -> {len(r)} hits")
+                    all_jobs.extend(r)
             except Exception:
                 pass
     return all_jobs
@@ -949,59 +982,66 @@ def scrape_all_lever(scorer: JobScorer) -> List[dict]:
 
 # ── 7d. iCIMS ────────────────────────────────────────────────────────────────
 
-ICIMS_CLIENTS = [
-    ("blakes",       "Blake Cassels & Graydon"),
-    ("mccarthy",     "McCarthy Tetrault"),
-    ("nortonrose",   "Norton Rose Fulbright"),
-    ("torys",        "Torys LLP"),
-    ("stikeman",     "Stikeman Elliott"),
-    ("gowling",      "Gowling WLG"),
-    ("bennettjones", "Bennett Jones"),
-    ("airdberlis",   "Aird & Berlis"),
-    ("cassels",      "Cassels Brock"),
+# BUG FIX (v11): iCIMS portal URLs are firm-specific — not all firms use the
+# careers-{subdomain}.icims.com pattern. Using verified full URLs instead.
+ICIMS_PORTALS = [
+    # (base_url, company)  -- these are verified iCIMS portal URLs
+    ("https://careers-blakes.icims.com",       "Blake Cassels & Graydon"),
+    ("https://careers-mccarthy.icims.com",      "McCarthy Tetrault"),
+    ("https://careers-nortonrose.icims.com",    "Norton Rose Fulbright"),
+    ("https://careers-torys.icims.com",         "Torys LLP"),
+    ("https://careers-stikeman.icims.com",      "Stikeman Elliott"),
+    ("https://careers-gowling.icims.com",       "Gowling WLG"),
+    ("https://careers-bennettjones.icims.com",  "Bennett Jones"),
+    ("https://careers-airdberlis.icims.com",    "Aird & Berlis"),
+    ("https://careers-cassels.icims.com",       "Cassels Brock"),
 ]
 
-def scrape_icims_client(subdomain: str, company: str, scorer: JobScorer) -> List[dict]:
+_ICIMS_KEYWORDS = ["associate+lawyer", "articling+student", "legal+counsel"]
+
+
+def scrape_icims_portal(base_url: str, company: str, scorer: JobScorer) -> List[dict]:
     session = get_session()
     results = []
-    for keyword in ["associate lawyer", "articling student", "legal counsel"]:
-        url = (
-            f"https://careers-{subdomain}.icims.com/jobs/search"
-            f"?pr=1&ss=1&searchKeyword={keyword.replace(' ', '+')}"
-            f"&searchCategory=Legal&in_iframe=1"
-        )
+    for kw in _ICIMS_KEYWORDS:
+        url  = f"{base_url}/jobs/search?pr=1&ss=1&searchKeyword={kw}&in_iframe=1"
         resp = safe_get(session, url, timeout=15)
         if not resp:
             continue
         soup = BeautifulSoup(resp.text, "html.parser")
-        for a in soup.find_all("a", href=True, class_=re.compile(r"iCIMS_Anchor|title")):
+        # iCIMS renders job titles as links with class containing 'title' or 'iCIMS_Anchor'
+        for a in soup.find_all("a", href=True):
+            cls  = " ".join(a.get("class", []))
+            if not re.search(r"title|iCIMS_Anchor|job", cls, re.I):
+                continue
             text = a.get_text(" ", strip=True)
             href = a["href"]
             if not href.startswith("http"):
-                href = f"https://careers-{subdomain}.icims.com{href}"
-            if not _is_law_job(text):
+                href = base_url + href
+            if not _is_law_job(text) or len(text) < MIN_TITLE_LENGTH:
                 continue
             is_fit, cat, score = scorer.score_job(text, "", href, company)
             if is_fit:
                 results.append({
-                    "TITLE":    text,
-                    "COMPANY":  company,
-                    "URL":      href,
-                    "CATEGORY": cat,
-                    "SCORE":    score,
-                    "SOURCE":   "icims",
-                    "DATE":     "",
+                    "TITLE": text, "COMPANY": company, "URL": href,
+                    "CATEGORY": cat, "SCORE": score, "SOURCE": "icims", "DATE": "",
                 })
     return results
 
+# Keep old name for backward compat
+ICIMS_CLIENTS = [(b, c) for b, c in ICIMS_PORTALS]
+
 def scrape_all_icims(scorer: JobScorer) -> List[dict]:
-    log.info(f"  [iCIMS] Scanning {len(ICIMS_CLIENTS)} clients...")
+    log.info(f"  [iCIMS] Scanning {len(ICIMS_PORTALS)} portals...")
     all_jobs: List[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(scrape_icims_client, s, c, scorer): c for s, c in ICIMS_CLIENTS}
+        futures = {ex.submit(scrape_icims_portal, b, c, scorer): c for b, c in ICIMS_PORTALS}
         for f in concurrent.futures.as_completed(futures):
             try:
-                all_jobs.extend(f.result())
+                r = f.result()
+                if r:
+                    log.info(f"  [iCIMS] {futures[f]} -> {len(r)} hits")
+                    all_jobs.extend(r)
             except Exception:
                 pass
     return all_jobs
@@ -1517,6 +1557,81 @@ def scrape_gmail(scorer: JobScorer) -> List[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 11b. ELUTA.CA SCRAPER  (v11 — Canada's largest job aggregator)
+# ─────────────────────────────────────────────────────────────────────────────
+# Eluta.ca aggregates Canadian job postings directly from employer websites —
+# no login needed, structured HTML, reliable and fast.
+
+_ELUTA_SEARCHES = [
+    "https://www.eluta.ca/search?q=associate+lawyer&l=ontario",
+    "https://www.eluta.ca/search?q=associate+lawyer&l=alberta",
+    "https://www.eluta.ca/search?q=articling+student&l=ontario",
+    "https://www.eluta.ca/search?q=legal+counsel&l=toronto",
+    "https://www.eluta.ca/search?q=newly+called+lawyer&l=ontario",
+]
+
+
+def scrape_eluta(scorer: JobScorer) -> List[dict]:
+    session = get_session()
+    results: List[dict] = []
+    seen_urls: set = set()
+
+    for search_url in _ELUTA_SEARCHES:
+        try:
+            resp = safe_get(session, search_url, timeout=15)
+            if not resp:
+                continue
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Eluta job cards have class "result" with an <a> title link
+            for card in soup.find_all(["div", "li", "article"],
+                                       class_=re.compile(r"result|job|posting", re.I)):
+                # Extract title link
+                title_a = card.find("a", class_=re.compile(r"title|job.?title|position", re.I))
+                if not title_a:
+                    title_a = card.find("a", href=True)
+                if not title_a:
+                    continue
+
+                title = title_a.get_text(" ", strip=True)
+                href  = title_a.get("href", "")
+                if not href.startswith("http"):
+                    href = "https://www.eluta.ca" + href
+
+                if href in seen_urls:
+                    continue
+
+                # Company and date
+                company_el = card.find(class_=re.compile(r"company|employer|org", re.I))
+                company    = company_el.get_text(strip=True) if company_el else ""
+                date_el    = card.find(class_=re.compile(r"date|posted|age", re.I))
+                date_str   = date_el.get_text(strip=True) if date_el else ""
+
+                if not _is_law_job(title):
+                    continue
+                if len(title) < MIN_TITLE_LENGTH:
+                    continue
+
+                desc = card.get_text(" ", strip=True)
+                is_fit, cat, score = scorer.score_job(title, desc, href, company)
+                if is_fit:
+                    seen_urls.add(href)
+                    results.append({
+                        "TITLE":    title,
+                        "COMPANY":  company or _domain_key(href).title(),
+                        "URL":      href,
+                        "CATEGORY": cat,
+                        "SCORE":    score,
+                        "SOURCE":   "eluta",
+                        "DATE":     date_str,
+                    })
+        except Exception as e:
+            log.debug(f"[Eluta] {search_url[:60]}: {e}")
+
+    return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 12. ORCHESTRATE ALL SCRAPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1545,6 +1660,12 @@ def run_all_scrapers(scorer: JobScorer) -> pd.DataFrame:
     rss_jobs = scrape_rss_feeds(scorer)
     if rss_jobs:
         frames.append(pd.DataFrame(rss_jobs))
+
+    log.info("\n-- Eluta.ca (Canadian job aggregator) ------------------")
+    eluta_jobs = scrape_eluta(scorer)
+    if eluta_jobs:
+        frames.append(pd.DataFrame(eluta_jobs))
+    log.info(f"  -> {len(eluta_jobs)} hits from Eluta")
 
     log.info("\n-- Workday ATS -----------------------------------------")
     wd_jobs = scrape_all_workday(scorer)
@@ -2035,7 +2156,7 @@ def main() -> None:
     run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     print("=" * 60, flush=True)
-    print("Law Associate Job Scraper -- v9", flush=True)
+    print("Law Associate Job Scraper -- v11", flush=True)
     print(f"Run: {run_ts}", flush=True)
     print("=" * 60, flush=True)
 
