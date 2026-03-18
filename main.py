@@ -100,7 +100,8 @@ RESULTS_FILE      = os.environ.get("RESULTS_FILE",   "results.json")
 LLM_CACHE_FILE    = os.environ.get("LLM_CACHE_FILE", "llm_cache.json")
 RESULTS_WANTED    = int(os.environ.get("RESULTS_WANTED") or "30")
 DASHBOARD_URL     = os.environ.get("DASHBOARD_URL",  "https://law-associate-job-alerts.vercel.app/")
-HISTORY_TTL_DAYS  = int(os.environ.get("HISTORY_TTL_DAYS") or "60")   # re-check URLs after N days
+HISTORY_TTL_DAYS  = int(os.environ.get("HISTORY_TTL_DAYS") or "60")
+MAX_JOB_AGE_DAYS  = int(os.environ.get("MAX_JOB_AGE_DAYS") or "14")  # drop jobs older than this   # re-check URLs after N days
 
 MIN_TITLE_LENGTH      = 15
 DEAD_DOMAIN_THRESHOLD = 15   # v8: raised from 5 — 5 was far too aggressive
@@ -139,6 +140,7 @@ RE_NAV_LINK_EXACT = re.compile(
 )
 RE_BLOCKED_TITLE = re.compile(
     r"\b(senior\s+associate|senior\s+counsel|senior\s+lawyer|"
+    r"senior\s+\w+\s+counsel|senior\s+\w+\s+lawyer|"   # "Senior Legal Counsel", "Senior Corporate Lawyer"
     r"managing\s+partner|equity\s+partner|non[-\s]equity\s+partner|"
     r"director|chief\s+legal|vp\s+legal|vice\s+president|"
     r"general\s+counsel|deputy\s+general\s+counsel|associate\s+general\s+counsel|"
@@ -153,7 +155,16 @@ RE_BLOCKED_TITLE = re.compile(
     r"subscribe|newsletter|podcast|webinar|"
     r"cpa\s+articling|cpa\s+student|co-op\s+cpa|co\s+op\s+cpa|"
     r"assurance\s+and\s+accounting|tax\s+articling|"
-    r"counsel\s+to\s+(?:the\s+)?(?:\w+\s+){0,4}(?:during|in\s+the|on\s+the|regarding))\b",
+    r"counsel\s+to\s+(?:the\s+)?(?:\w+\s+){0,4}(?:during|in\s+the|on\s+the|regarding)|"
+    r"representative\s+counsel|independent\s+counsel\s+to|court-appointed|"
+    r"acted\s+as\s+counsel|served\s+as\s+counsel|"
+    r"named\s+partner|joins\s+(?:as\s+)?partner|promoted\s+to|"
+    r"ripple\s+through|poaching\s+of\s+canadian|on\s+the\s+upswing|"
+    r"talent\s+pool|interest\s+form|expression\s+of\s+interest)\b"
+    # Prefix patterns that cannot use trailing \b (word continues after match)
+    r"|future\s+opportunit"   # matches "Future Opportunities", "future opportunity"
+    r"|acted\s+as\s+counsel"  # already in group but also handles prefix edge case
+    r"|court.appointed",      # "court-appointed" / "court appointed"
     re.IGNORECASE,
 )
 RE_FREELANCE = re.compile(
@@ -263,6 +274,41 @@ def _strip_tracking(url: str) -> str:
     return urlunparse(parsed._replace(query=clean_query, fragment=""))
 
 
+# Date formats commonly seen in job feeds and ATS responses
+_DATE_FORMATS = [
+    "%Y-%m-%d", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S",
+    "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y",
+    "%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S GMT",
+]
+
+
+def _parse_date(date_str: str) -> Optional[datetime]:
+    """Parse a date string into a UTC-aware datetime. Returns None on failure."""
+    if not date_str or str(date_str).strip() in ("", "nan", "None", "NaT"):
+        return None
+    s = str(date_str).strip()
+    for fmt in _DATE_FORMATS:
+        try:
+            dt = datetime.strptime(s[:len(fmt)+5], fmt)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
+def _is_recent(date_str: str, max_age_days: int = MAX_JOB_AGE_DAYS) -> bool:
+    """Return True if date_str is within max_age_days, or if the date is unknown (blank)."""
+    if not date_str or str(date_str).strip() in ("", "nan", "None", "NaT"):
+        return True   # no date = keep (we can't tell; let Gemini decide)
+    dt = _parse_date(date_str)
+    if dt is None:
+        return True   # unparseable = keep
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    return dt >= cutoff
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. ADAPTIVE MODEL WEIGHTS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -302,12 +348,17 @@ def load_weights() -> Dict[str, Any]:
                 1 for k, v in sp.items()
                 if k in TRUSTED_CA_DOMAINS and v.get("hits", 0) == 0 and v.get("runs", 0) >= 5
             )
-            if trusted_zero > 3:
+            # Also detect corruption via low_productivity_domains containing known-good trusted firms
+            lpd = data.get("low_productivity_domains", [])
+            trusted_pruned = sum(1 for k in lpd if k in TRUSTED_CA_DOMAINS)
+            if trusted_zero > 3 or trusted_pruned > 2:
                 log.warning(
-                    f"[Weights] Detected {trusted_zero} trusted domains with 0 hits — "
-                    "site_productivity data is corrupted; resetting."
+                    f"[Weights] Corrupted data detected "
+                    f"(trusted_zero={trusted_zero}, trusted_pruned={trusted_pruned}) — "
+                    "resetting site_productivity and low_productivity_domains."
                 )
-                data["site_productivity"] = {}
+                data["site_productivity"]        = {}
+                data["low_productivity_domains"] = []   # BUG FIX: was missing in v8/v9
             return data
         except Exception as e:
             log.warning(f"Could not load weights: {e}. Using defaults.")
@@ -1060,11 +1111,12 @@ def get_target_urls() -> List[str]:
         "https://www.kmlaw.ca/careers/",
         "https://www.sotos.ca/careers/",
         "https://www.stockwoods.ca/careers/",
-        "https://www.brauti.com/careers/",
+        # brauti.com removed — network unreachable confirmed 2026-03-18
         "https://www.fasken.com/en/careers/students",
         "https://www.chaitons.com/careers/",
-        "https://www.lerners.ca/careers/",
+        "https://www.lerners.ca/careers/",      # kept but timeout reduced in safe_get
         "https://hicksadams.com/careers/",
+        # brauti.com removed — confirmed network unreachable in 2026-03-18 logs
         # Alberta Regional Firms
         "https://www.fieldlaw.com/careers/associate-opportunities/",
         "https://www.bdplaw.com/careers/",
@@ -1119,64 +1171,60 @@ def get_target_urls() -> List[str]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 _RSS_FEEDS = [
-    # Google News — law jobs in Ontario / Alberta
+    # Indeed RSS — structured job data, fromage=7 enforces 7-day freshness server-side
     (
-        "https://news.google.com/rss/search?"
-        "q=associate+lawyer+hiring+Ontario+Canada&hl=en-CA&gl=CA&ceid=CA:en",
-        "google-news"
-    ),
-    (
-        "https://news.google.com/rss/search?"
-        "q=articling+student+position+Ontario&hl=en-CA&gl=CA&ceid=CA:en",
-        "google-news"
-    ),
-    (
-        "https://news.google.com/rss/search?"
-        "q=legal+counsel+job+opening+Toronto&hl=en-CA&gl=CA&ceid=CA:en",
-        "google-news"
-    ),
-    (
-        "https://news.google.com/rss/search?"
-        "q=%22associate+lawyer%22+OR+%22articling+student%22+Calgary+Edmonton&hl=en-CA&gl=CA&ceid=CA:en",
-        "google-news"
-    ),
-    # Indeed RSS feeds — reliable, structured, no auth
-    (
-        "https://ca.indeed.com/rss?q=associate+lawyer&l=Toronto%2C+Ontario&fromage=7&sort=date",
+        "https://ca.indeed.com/rss?q=%22associate+lawyer%22&l=Toronto%2C+Ontario&fromage=7&sort=date",
         "indeed-rss"
     ),
     (
-        "https://ca.indeed.com/rss?q=associate+lawyer&l=Ontario&fromage=7&sort=date",
+        "https://ca.indeed.com/rss?q=%22associate+lawyer%22&l=Ontario&fromage=7&sort=date",
         "indeed-rss"
     ),
     (
-        "https://ca.indeed.com/rss?q=articling+student&l=Ontario&fromage=14&sort=date",
+        "https://ca.indeed.com/rss?q=%22articling+student%22&l=Ontario&fromage=14&sort=date",
         "indeed-rss"
     ),
     (
-        "https://ca.indeed.com/rss?q=associate+lawyer&l=Alberta&fromage=7&sort=date",
+        "https://ca.indeed.com/rss?q=%22associate+lawyer%22&l=Alberta&fromage=7&sort=date",
         "indeed-rss"
     ),
     (
-        "https://ca.indeed.com/rss?q=legal+counsel&l=Toronto%2C+Ontario&fromage=7&sort=date",
+        "https://ca.indeed.com/rss?q=%22articling+student%22&l=Alberta&fromage=14&sort=date",
         "indeed-rss"
     ),
-    # ZSA Legal Recruitment RSS (top Canadian legal recruiter)
+    (
+        "https://ca.indeed.com/rss?q=%22legal+counsel%22&l=Toronto%2C+Ontario&fromage=7&sort=date",
+        "indeed-rss"
+    ),
+    (
+        "https://ca.indeed.com/rss?q=%22newly+called+lawyer%22&l=Ontario&fromage=14&sort=date",
+        "indeed-rss"
+    ),
+    # ZSA Legal Recruitment RSS (top Canadian legal recruiter — actual job listings)
     (
         "https://www.zsa.ca/feed/",
         "zsa-rss"
     ),
-    # Ultra Vires (Osgoode / U of T law student paper — posts real openings)
+    # Ultra Vires (U of T / Osgoode law student paper — posts real Bay Street openings)
     (
         "https://ultravires.ca/feed/",
         "ultravires-rss"
     ),
 ]
 
-_RE_RSS_ITEM = re.compile(
-    r"<item>(.*?)</item>",
-    re.DOTALL | re.IGNORECASE,
+# Patterns that indicate a NEWS ARTICLE rather than a job posting
+_RE_NEWS_TITLE = re.compile(
+    r"\b(says|reports?|explains?|weighs\s+in|discusses|comments?\s+on|"
+    r"named?\s+partner|joins?\s+(as\s+)?partner|promoted\s+to|appointed\s+to|"
+    r"(?:on|with|for)\s+(?:cbc|ctv|global\s+news|cp24|bnn|bloomberg)|"
+    r"ripple\s+through|on\s+the\s+upswing|poaching|magazine|"
+    r":\s+meet\s+the|interview\s+with|profile\s+of|"
+    r"what\s+will|will\s+the\s+conversation|fixing\s+articling|"
+    r"law\s+firm\s+layoffs|pay\s+cuts|bay\s+street\s+job\s+market)\b",
+    re.IGNORECASE,
 )
+
+_RE_RSS_ITEM  = re.compile(r"<item>(.*?)</item>", re.DOTALL | re.IGNORECASE)
 _RE_RSS_TITLE = re.compile(r"<title[^>]*><!\[CDATA\[(.*?)\]\]></title>|<title[^>]*>(.*?)</title>", re.DOTALL | re.IGNORECASE)
 _RE_RSS_LINK  = re.compile(r"<link[^>]*>(.*?)</link>|<guid[^>]*>(.*?)</guid>",                     re.DOTALL | re.IGNORECASE)
 _RE_RSS_DATE  = re.compile(r"<pubDate[^>]*>(.*?)</pubDate>",                                        re.DOTALL | re.IGNORECASE)
@@ -1193,9 +1241,8 @@ def _parse_rss_items(xml: str) -> List[Dict[str, str]]:
         de = _RE_RSS_DESC.search(block)
         title = (tm.group(1) or tm.group(2) or "").strip() if tm else ""
         link  = (lm.group(1) or lm.group(2) or "").strip() if lm else ""
-        date  = (dm.group(1) or "").strip()[:10]            if dm else ""
+        date  = (dm.group(1) or "").strip()                 if dm else ""
         desc  = (de.group(1) or de.group(2) or "").strip()  if de else ""
-        # strip HTML from desc
         desc  = BeautifulSoup(desc, "html.parser").get_text(" ")
         if title and link:
             items.append({"title": title, "link": link, "date": date, "desc": desc})
@@ -1218,6 +1265,16 @@ def scrape_rss_feeds(scorer: JobScorer) -> List[dict]:
                 desc  = item["desc"]
                 date  = item["date"]
 
+                # Drop news articles immediately — they are not job postings
+                if _RE_NEWS_TITLE.search(title):
+                    log.debug(f"[RSS] News article skipped: {title[:60]}")
+                    continue
+
+                # Freshness gate: drop items older than MAX_JOB_AGE_DAYS
+                if not _is_recent(date):
+                    log.debug(f"[RSS] Stale item skipped ({date}): {title[:60]}")
+                    continue
+
                 if not (RE_ASSOCIATE.search(title) or RE_STUDENT.search(title)):
                     if not (RE_ASSOCIATE.search(desc[:300]) or RE_STUDENT.search(desc[:300])):
                         continue
@@ -1238,7 +1295,7 @@ def scrape_rss_feeds(scorer: JobScorer) -> List[dict]:
             log.debug(f"[RSS] {source_name} ({feed_url[:60]}): {e}")
 
     if results:
-        log.info(f"  → {len(results)} hits from RSS feeds")
+        log.info(f"  -> {len(results)} hits from RSS feeds")
     return results
 
 
@@ -1287,6 +1344,10 @@ def scrape_jobspy_wrapper(scorer: JobScorer) -> pd.DataFrame:
                         url     = str(row.get("JOB_URL",     ""))
                         company = str(row.get("COMPANY",     ""))
                         date    = str(row.get("DATE_POSTED", ""))
+                        # Drop stale postings — JobSpy sometimes returns weeks-old results
+                        if not _is_recent(date):
+                            log.debug(f"[JobSpy] Stale skipped ({date}): {title[:50]}")
+                            continue
                         is_fit, cat, score = scorer.score_job(title, desc, url, company)
                         if is_fit:
                             all_rows.append({
