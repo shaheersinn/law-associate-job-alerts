@@ -1,7 +1,7 @@
 {
   "version": 11,
-  "training_runs": 105,
-  "last_trained": "2026-03-22T12:22:40Z",
+  "training_runs": 106,
+  "last_trained": "2026-03-22T14:17:12Z",
   "score_threshold": 3,
   "keyword_weights": {
     "associate": 20,
@@ -17,528 +17,517 @@
   "site_productivity": {
     "joinblakes": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "bennettjones": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "fasken": {
       "hits": 0,
-      "runs": 6,
+      "runs": 8,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 6
+      "consecutive_zeros": 8
     },
     "gowlingwlg": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "stikeman": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "dwpv": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "mccarthy": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "torys": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "goodmans": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "blg": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "millerthomson": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "cassels": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "airdberlis": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "osler": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "davies": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "litigate": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "wildlaw": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "weirfoulds": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "tgf": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "blaney": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "foglers": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "singleton": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "paliareroland": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "cohenhighley": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "hicksmorley": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "glaholt": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "shibleyrighton": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "carters": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "cavalluzzo": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "goldblattpartners": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "siskinds": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "kmlaw": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "sotos": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "stockwoods": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "chaitons": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "lerners": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "hicksadams": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "fieldlaw": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "bdplaw": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "parlee": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "mross": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "brownleelaw": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "emeryjamieson": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "jmccormick": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "dentons": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "nortonrosefulbright": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "dlapiper": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "bakermckenzie": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "herbertsmithfreehills": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "cliffordchance": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "linklaters": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "zsa": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "thecounselnetwork": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "legaljobs": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "oba": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "ab": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "lso": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "cba": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "rbc": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "td": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "sunlife": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "manulife": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "enbridge": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "suncor": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "telus": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "bmo": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "scotiabank": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "cibc": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "ultravires": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "yorku": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "indeed": {
       "hits": 0,
-      "runs": 12,
+      "runs": 16,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 12
+      "consecutive_zeros": 16
     },
     "glassdoor": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     },
     "talent": {
       "hits": 0,
-      "runs": 3,
+      "runs": 4,
       "rate": 0.0,
       "last_hit": null,
-      "consecutive_zeros": 3
+      "consecutive_zeros": 4
     }
   },
   "run_history": [
-    {
-      "timestamp": "2026-03-18T10:39:06Z",
-      "jobs_found": 1,
-      "sites_hit": [
-        "tgf"
-      ],
-      "threshold": 3,
-      "source_breakdown": {
-        "direct-html": 1
-      }
-    },
     {
       "timestamp": "2026-03-18T12:14:32Z",
       "jobs_found": 30,
@@ -962,9 +951,20 @@
       "sites_hit": [],
       "threshold": 3,
       "source_breakdown": {}
+    },
+    {
+      "timestamp": "2026-03-22T14:17:12Z",
+      "jobs_found": 1,
+      "sites_hit": [
+        "linkedin"
+      ],
+      "threshold": 3,
+      "source_breakdown": {
+        "jobspy": 1
+      }
     }
   ],
-  "total_jobs_found": 92,
+  "total_jobs_found": 93,
   "source_stats": {
     "direct-html": {
       "total_jobs": 21,
@@ -972,9 +972,9 @@
       "avg_per_run": 1.24
     },
     "jobspy": {
-      "total_jobs": 52,
-      "total_runs": 23,
-      "avg_per_run": 2.26
+      "total_jobs": 53,
+      "total_runs": 24,
+      "avg_per_run": 2.21
     },
     "google-news": {
       "total_jobs": 19,
@@ -982,7 +982,9 @@
       "avg_per_run": 9.5
     }
   },
-  "low_productivity_domains": [],
+  "low_productivity_domains": [
+    "indeed"
+  ],
   "false_positive_domains": [],
   "first_seen_domains": [
     "chaitons",
