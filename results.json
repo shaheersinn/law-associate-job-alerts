@@ -1,18 +1,9 @@
 {
-  "last_updated": "2026-04-12T12:31:54Z",
-  "total_all_time": 156,
+  "last_updated": "2026-04-12T14:31:11Z",
+  "total_all_time": 155,
   "training_runs": 333,
   "score_threshold": 3,
   "runs": [
-    {
-      "run_id": "20260325T040752Z",
-      "timestamp": "2026-03-25T04:07:52Z",
-      "jobs_found": 0,
-      "training_run": 134,
-      "threshold": 3,
-      "source_breakdown": {},
-      "jobs": []
-    },
     {
       "run_id": "20260325T064727Z",
       "timestamp": "2026-03-25T06:47:27Z",
@@ -2419,6 +2410,15 @@
       "threshold": 3,
       "source_breakdown": {},
       "jobs": []
+    },
+    {
+      "run_id": "20260412T143111Z",
+      "timestamp": "2026-04-12T14:31:11Z",
+      "jobs_found": 0,
+      "training_run": 333,
+      "threshold": 3,
+      "source_breakdown": {},
+      "jobs": []
     }
   ],
   "site_productivity": {
@@ -2936,9 +2936,9 @@
   },
   "source_stats": {
     "direct-html": {
-      "total_jobs": 34,
-      "total_runs": 28,
-      "avg_per_run": 1.21
+      "total_jobs": 33,
+      "total_runs": 27,
+      "avg_per_run": 1.22
     },
     "jobspy": {
       "total_jobs": 103,
